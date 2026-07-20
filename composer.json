@@ -1,0 +1,34 @@
+{
+    "name": "acme/bundle-template",
+    "description": "Template for Symfony bundles",
+    "type": "symfony-bundle",
+    "license": "GPL-3.0-only",
+    "version": "0.0.1",
+    "autoload": {
+        "psr-4": {
+            "Acme\\Bundle\\TemplateBundle\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Acme\\Bundle\\TemplateBundle\\Tests\\": "tests/",
+            "SymfonyBundleTemplate\\Configurator\\": "tools/Configurator/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Te4g",
+            "email": "47118498+Te4g@users.noreply.github.com"
+        }
+    ],
+    "require": {
+        "symfony/dependency-injection": "^8.1",
+        "symfony/config": "^8.1",
+        "symfony/http-kernel": "^8.1"
+    },
+    "require-dev": {
+        "friendsofphp/php-cs-fixer": "^3.86",
+        "phpstan/phpstan": "^2.1",
+        "phpunit/phpunit": "^12.3"
+    }
+}
