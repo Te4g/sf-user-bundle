@@ -38,11 +38,21 @@ final class ConfiguredAccountUserFactoryTest extends TestCase
         $factory->create('user@example.com');
     }
 
-    public function testFactoryRejectsAClassWithAnOptionalConstructorArgument(): void
+    public function testFactoryCreatesAContractImplementationWithAnOptionalConstructorArgument(): void
     {
         $factory = new ConfiguredAccountUserFactory(AccountUserWithOptionalArgument::class);
 
+        $user = $factory->create('user@example.com');
+
+        self::assertSame('user@example.com', $user->getEmail());
+    }
+
+    public function testFactoryDoesNotExposeAThrowingConstructorMessage(): void
+    {
+        $factory = new ConfiguredAccountUserFactory(AccountUserWithThrowingConstructor::class);
+
         $this->expectException(InvalidAccountState::class);
+        $this->expectExceptionMessage('The configured account user cannot be created.');
 
         $factory->create('user@example.com');
     }
@@ -63,5 +73,13 @@ final class AccountUserWithOptionalArgument extends TestAccountUser
 {
     public function __construct(?string $optionalArgument = null)
     {
+    }
+}
+
+final class AccountUserWithThrowingConstructor extends TestAccountUser
+{
+    public function __construct()
+    {
+        throw new \RuntimeException('Constructor details must not be exposed.');
     }
 }
