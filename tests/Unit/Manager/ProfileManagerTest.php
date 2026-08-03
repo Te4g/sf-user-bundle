@@ -258,6 +258,35 @@ final class ProfileManagerTest extends TestCase
         }
     }
 
+    public function testConfirmationRejectsUnknownAccountAfterExactLoadWithoutAnyOtherSideEffect(): void
+    {
+        $trace = new OperationTrace();
+        $repository = new ProfileTestRepository($trace);
+        $helper = new ProfileTestVerifyEmailHelper($trace);
+        $mailer = new ProfileTestMailer($trace);
+        $resetRequests = new ProfileTestResetRepository($trace);
+        $events = new ProfileTestEventDispatcher($trace);
+
+        try {
+            $this->manager($repository, helper: $helper, mailer: $mailer, resetRequests: $resetRequests, events: $events)
+                ->confirmEmailChange('https://example.test/email-change/missing?signature=unknown-secret', 'missing-account');
+            self::fail('An unknown account ID must not confirm an email change.');
+        } catch (EmailChangeFailed $exception) {
+            self::assertSame('Email change failed.', $exception->getMessage());
+            self::assertStringNotContainsString('missing-account', $exception->getMessage());
+            self::assertStringNotContainsString('unknown-secret', $exception->getMessage());
+            self::assertNull($exception->getPrevious());
+        }
+
+        self::assertSame(['load:missing-account'], $trace->operations());
+        self::assertSame([], $helper->validationAttempts);
+        self::assertSame([], $helper->generatedSignatures);
+        self::assertSame([], $repository->saved);
+        self::assertSame([], $resetRequests->removedFor);
+        self::assertSame([], $mailer->messages);
+        self::assertSame([], $events->events);
+    }
+
     private function manager(
         ?ProfileTestRepository $repository = null,
         ?ProfileTestPasswordHasher $hasher = null,
