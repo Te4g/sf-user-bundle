@@ -8,6 +8,7 @@ use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\Extension;
 use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
+use Te4g\UserBundle\Contract\AccountDeletionGuardInterface;
 
 final class Te4gUserExtension extends Extension
 {
@@ -28,6 +29,10 @@ final class Te4gUserExtension extends Extension
         $loader->load('installer.php');
 
         if (true === $config['enabled']) {
+            $container
+                ->registerForAutoconfiguration(AccountDeletionGuardInterface::class)
+                ->addTag('te4g_user.account_deletion_guard')
+            ;
             $loader->load('runtime.php');
         }
     }
