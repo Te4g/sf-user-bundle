@@ -10,6 +10,7 @@ use Te4g\UserBundle\Exception\InstallerRollbackIncomplete;
 use Te4g\UserBundle\Exception\InstallerWriteFailed;
 use Te4g\UserBundle\Installer\InstallationCreateRaceHookInterface;
 use Te4g\UserBundle\Installer\InstallationPlan;
+use Te4g\UserBundle\Installer\InstallationPostWriteRaceHookInterface;
 use Te4g\UserBundle\Installer\InstallationRaceHookInterface;
 use Te4g\UserBundle\Installer\InstallationValidator;
 use Te4g\UserBundle\Installer\InstallationValidatorInterface;
@@ -131,6 +132,119 @@ final class StagedWriterTest extends TestCase
         self::assertSame("<?php\nreturn 'original';\n", file_get_contents($this->projectDir.'/src/Existing.php'));
         self::assertSame(0600, fileperms($this->projectDir.'/src/Existing.php') & 0777);
         self::assertFileDoesNotExist($this->projectDir.'/config/new.json');
+    }
+
+    public function testApplyRevalidatesEveryWrittenSnapshotAfterAllPostWriteValidation(): void
+    {
+        $validator = new class ($this->projectDir) implements InstallationValidatorInterface {
+            public function __construct(private readonly string $projectDir)
+            {
+            }
+
+            public function validate(string $absolutePath, string $relativePath): void
+            {
+                if ('second.txt' === $relativePath
+                    && !str_contains($absolutePath, '/var/te4g-user-installer/')
+                ) {
+                    file_put_contents($this->projectDir.'/first.txt', 'later application edit');
+                }
+            }
+        };
+
+        try {
+            (new StagedWriter($validator))->apply(InstallationPlan::forLayout($this->layout, [
+                PlannedFile::create('first.txt', 'generated first'),
+                PlannedFile::create('second.txt', 'generated second'),
+            ]));
+            self::fail('A late edit to an earlier write must fail the whole apply operation.');
+        } catch (InstallerRollbackIncomplete $exception) {
+            self::assertSame('write-failed', $exception->primaryOutcome());
+            self::assertSame('ownership-conflict', $exception->rollbackOutcome());
+            self::assertNull($exception->getPrevious());
+        }
+
+        self::assertSame('later application edit', file_get_contents($this->projectDir.'/first.txt'));
+        self::assertFileDoesNotExist($this->projectDir.'/second.txt');
+    }
+
+    public function testFinalRevalidationRejectsSameContentReplacementOfAnEarlierWrite(): void
+    {
+        $validator = new class ($this->projectDir) implements InstallationValidatorInterface {
+            public ?int $replacementInode = null;
+
+            public function __construct(private readonly string $projectDir)
+            {
+            }
+
+            public function validate(string $absolutePath, string $relativePath): void
+            {
+                if ('second.txt' !== $relativePath
+                    || str_contains($absolutePath, '/var/te4g-user-installer/')
+                ) {
+                    return;
+                }
+
+                $replacement = $this->projectDir.'/application-replacement';
+                file_put_contents($replacement, 'generated first');
+                $stat = lstat($replacement);
+                $this->replacementInode = false === $stat ? null : $stat['ino'];
+                rename($replacement, $this->projectDir.'/first.txt');
+            }
+        };
+
+        try {
+            (new StagedWriter($validator))->apply(InstallationPlan::forLayout($this->layout, [
+                PlannedFile::create('first.txt', 'generated first'),
+                PlannedFile::create('second.txt', 'generated second'),
+            ]));
+            self::fail('A replacement inode must fail the final transaction-wide revalidation.');
+        } catch (InstallerRollbackIncomplete $exception) {
+            self::assertSame('ownership-conflict', $exception->rollbackOutcome());
+        }
+
+        $currentStat = lstat($this->projectDir.'/first.txt');
+        self::assertIsArray($currentStat);
+        self::assertSame($validator->replacementInode, $currentStat['ino']);
+        self::assertFileDoesNotExist($this->projectDir.'/second.txt');
+    }
+
+    public function testFinalRevalidationRejectsAncestorReplacementOfAnEarlierWrite(): void
+    {
+        mkdir($this->projectDir.'/existing-parent');
+        $validator = new class ($this->projectDir) implements InstallationValidatorInterface {
+            public function __construct(private readonly string $projectDir)
+            {
+            }
+
+            public function validate(string $absolutePath, string $relativePath): void
+            {
+                if ('second.txt' !== $relativePath
+                    || str_contains($absolutePath, '/var/te4g-user-installer/')
+                ) {
+                    return;
+                }
+
+                rename($this->projectDir.'/existing-parent', $this->projectDir.'/existing-parent-application');
+                mkdir($this->projectDir.'/existing-parent');
+            }
+        };
+
+        try {
+            (new StagedWriter($validator))->apply(InstallationPlan::forLayout($this->layout, [
+                PlannedFile::create('existing-parent/first.txt', 'generated first'),
+                PlannedFile::create('second.txt', 'generated second'),
+            ]));
+            self::fail('An ancestor replacement must fail the final transaction-wide revalidation.');
+        } catch (InstallerRollbackIncomplete $exception) {
+            self::assertSame('ownership-conflict', $exception->rollbackOutcome());
+        }
+
+        self::assertSame(
+            'generated first',
+            file_get_contents($this->projectDir.'/existing-parent-application/first.txt'),
+        );
+        self::assertFileDoesNotExist($this->projectDir.'/existing-parent/first.txt');
+        self::assertFileDoesNotExist($this->projectDir.'/second.txt');
     }
 
     public function testApplyRollsBackEarlierWritesWhenALaterTargetMoveCannotStart(): void
@@ -277,6 +391,80 @@ final class StagedWriterTest extends TestCase
         } finally {
             self::assertSame('competing application file', file_get_contents($this->projectDir.'/created.txt'));
         }
+    }
+
+    public function testSameContentReplacementAfterMutationNeverBecomesInstallerOwned(): void
+    {
+        $hook = new class () implements InstallationPostWriteRaceHookInterface, InstallationRaceHookInterface {
+            public function beforeTargetWrite(ProjectLayout $layout, PlannedFile $file): void
+            {
+            }
+
+            public function afterTargetMutation(ProjectLayout $layout, PlannedFile $file): void
+            {
+                $replacement = $layout->path('application-replacement');
+                file_put_contents($replacement, $file->contents());
+                rename($replacement, $layout->path($file->relativePath()));
+            }
+
+            public function beforeRollback(ProjectLayout $layout, string $relativePath): void
+            {
+            }
+        };
+
+        try {
+            (new StagedWriter($this->validator(), $hook))->apply(InstallationPlan::forLayout($this->layout, [
+                PlannedFile::create('created.txt', 'generated'),
+            ]));
+            self::fail('A replacement inode must not become installer-owned even when its content is identical.');
+        } catch (InstallerConflict $exception) {
+            self::assertSame('write-target-changed', $exception->code());
+        }
+
+        self::assertSame('generated', file_get_contents($this->projectDir.'/created.txt'));
+    }
+
+    public function testSameContentManagedReplacementAfterRenameIsNeverRolledBack(): void
+    {
+        $this->write('managed.txt', 'generated original');
+        $hook = new class () implements InstallationPostWriteRaceHookInterface, InstallationRaceHookInterface {
+            public ?int $replacementInode = null;
+
+            public function beforeTargetWrite(ProjectLayout $layout, PlannedFile $file): void
+            {
+            }
+
+            public function afterTargetMutation(ProjectLayout $layout, PlannedFile $file): void
+            {
+                $replacement = $layout->path('application-replacement');
+                file_put_contents($replacement, $file->contents());
+                $stat = lstat($replacement);
+                $this->replacementInode = false === $stat ? null : $stat['ino'];
+                rename($replacement, $layout->path($file->relativePath()));
+            }
+
+            public function beforeRollback(ProjectLayout $layout, string $relativePath): void
+            {
+            }
+        };
+
+        try {
+            (new StagedWriter($this->validator(), $hook))->apply(InstallationPlan::forLayout($this->layout, [
+                PlannedFile::managedUpdate(
+                    'managed.txt',
+                    hash('sha256', 'generated original'),
+                    'generated update',
+                ),
+            ]));
+            self::fail('A post-rename replacement inode must not become installer-owned.');
+        } catch (InstallerConflict $exception) {
+            self::assertSame('write-target-changed', $exception->code());
+        }
+
+        $currentStat = lstat($this->projectDir.'/managed.txt');
+        self::assertIsArray($currentStat);
+        self::assertSame($hook->replacementInode, $currentStat['ino']);
+        self::assertSame('generated update', file_get_contents($this->projectDir.'/managed.txt'));
     }
 
     public function testManagedTargetRaceIsDetectedImmediatelyBeforeWrite(): void

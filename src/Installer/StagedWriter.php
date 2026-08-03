@@ -66,6 +66,7 @@ final readonly class StagedWriter
                 $this->assertTargetStateUnchanged($layout, $file, $originalIdentity);
 
                 $stagedPath = $stagedFiles[$file->relativePath()];
+                $expectedWrittenIdentity = $this->requiredRegularFileIdentity($stagedPath);
                 if ($file->isCreate()) {
                     if ($this->raceHook instanceof InstallationCreateRaceHookInterface) {
                         $this->raceHook->beforeCreateLink($layout, $file);
@@ -88,15 +89,26 @@ final readonly class StagedWriter
                     $this->filesystem->rename($stagedPath, $target);
                 }
 
-                $writtenIdentity = $this->filesystem->identity($target);
+                if ($this->raceHook instanceof InstallationPostWriteRaceHookInterface) {
+                    $this->raceHook->afterTargetMutation($layout, $file);
+                }
+
+                $this->assertParentUnchanged($layout, $parentRelative, $parentIdentity, $file->relativePath());
+                $writtenHash = hash('sha256', $file->contents());
+                if (!$expectedWrittenIdentity->equals($this->filesystem->identity($target))
+                    || !hash_equals($writtenHash, $this->filesystem->hash($target))
+                ) {
+                    throw InstallerConflict::forPath($file->relativePath(), 'write-target-changed');
+                }
+
                 $snapshot = new InstalledFileSnapshot(
                     $file->relativePath(),
                     $originalContents,
                     $originalMode,
                     $parentRelative,
                     $parentIdentity,
-                    hash('sha256', $file->contents()),
-                    $writtenIdentity,
+                    $writtenHash,
+                    $expectedWrittenIdentity,
                 );
                 $snapshots[] = $snapshot;
 
@@ -121,6 +133,10 @@ final readonly class StagedWriter
 
             $this->removeStagingDirectory($layout, $stagingRelative);
             $stagingCreated = false;
+
+            foreach ($snapshots as $snapshot) {
+                $this->assertInstallerWriteStable($layout, $snapshot);
+            }
 
             return $result;
         } catch (\Throwable $primaryFailure) {
@@ -306,6 +322,16 @@ final readonly class StagedWriter
     {
         $identity = $this->filesystem->identity($path);
         if (null === $identity || !$identity->isDirectory()) {
+            throw InstallerWriteFailed::writeFailed();
+        }
+
+        return $identity;
+    }
+
+    private function requiredRegularFileIdentity(string $path): FilesystemIdentity
+    {
+        $identity = $this->filesystem->identity($path);
+        if (null === $identity || !$identity->isRegularFile()) {
             throw InstallerWriteFailed::writeFailed();
         }
 
