@@ -14,10 +14,10 @@ final class TestKernel extends Kernel
     private string $cacheDir;
 
     /**
-     * @param array<string, mixed> $templateConfig
+     * @param array<string, mixed> $userConfig
      */
     public function __construct(
-        private readonly array $templateConfig = [],
+        private readonly array $userConfig = [],
     ) {
         $this->cacheDir = sys_get_temp_dir().'/template-bundle-'.bin2hex(random_bytes(6));
 
@@ -43,10 +43,10 @@ final class TestKernel extends Kernel
 
     public function registerContainerConfiguration(LoaderInterface $loader): void
     {
-        $templateConfig = $this->templateConfig;
+        $userConfig = $this->userConfig;
 
-        $loader->load(static function (ContainerBuilder $container) use ($templateConfig): void {
-            $container->loadFromExtension('te4g_user', $templateConfig);
+        $loader->load(static function (ContainerBuilder $container) use ($userConfig): void {
+            $container->loadFromExtension('te4g_user', $userConfig);
         });
     }
 }
