@@ -10,7 +10,12 @@ use Symfony\Component\DependencyInjection\Compiler\ResolveTaggedIteratorArgument
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Reference;
 use Te4g\UserBundle\Contract\AccountDeletionGuardInterface;
+use Te4g\UserBundle\Contract\AccountMailerInterface;
+use Te4g\UserBundle\Controller\AccountRequestLimiter;
+use Te4g\UserBundle\Controller\RegistrationController;
 use Te4g\UserBundle\DependencyInjection\Te4gUserExtension;
+use Te4g\UserBundle\Form\RegistrationType;
+use Te4g\UserBundle\Mailer\AccountMailer;
 use Te4g\UserBundle\Manager\AccountDeletionManager;
 use Te4g\UserBundle\Manager\MagicLinkManager;
 use Te4g\UserBundle\Manager\ProfileManager;
@@ -73,6 +78,29 @@ final class RuntimeServiceDefinitionsTest extends TestCase
         self::assertInstanceOf(Reference::class, $resolvedGuards[1]);
         self::assertSame('test.guard.high', (string) $resolvedGuards[0]);
         self::assertSame('test.guard.low', (string) $resolvedGuards[1]);
+    }
+
+    public function testEnabledRuntimeDefinesPrivatePublicHttpServicesAndConcreteMailer(): void
+    {
+        $container = new ContainerBuilder();
+
+        (new Te4gUserExtension())->load([[
+            'enabled' => true,
+            'user_class' => TestAccountUser::class,
+            'account_repository' => InMemoryAccountRepository::class,
+        ]], $container);
+
+        $controller = $container->getDefinition(RegistrationController::class);
+        self::assertFalse($controller->isPublic());
+        self::assertSame([[]], $controller->getTag('controller.service_arguments'));
+        self::assertTrue($container->hasDefinition(RegistrationType::class));
+        self::assertSame([[]], $container->getDefinition(RegistrationType::class)->getTag('form.type'));
+        self::assertTrue($container->hasDefinition(AccountMailer::class));
+        self::assertSame(AccountMailer::class, (string) $container->getAlias(AccountMailerInterface::class));
+
+        $limiter = $container->getDefinition(AccountRequestLimiter::class)->getArgument('$factory');
+        self::assertInstanceOf(Reference::class, $limiter);
+        self::assertSame('limiter.te4g_user_account_requests', (string) $limiter);
     }
 }
 
