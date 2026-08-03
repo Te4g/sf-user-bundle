@@ -21,10 +21,12 @@ use SymfonyCasts\Bundle\VerifyEmail\VerifyEmailHelperInterface;
 use Te4g\UserBundle\Contract\AccountMailerInterface;
 use Te4g\UserBundle\Contract\AccountRepositoryInterface;
 use Te4g\UserBundle\Contract\AccountUserInterface;
+use Te4g\UserBundle\Event\EmailChangedEvent;
 use Te4g\UserBundle\Security\AccountUserProvider;
 use Te4g\UserBundle\Security\VerifiedAccountUserChecker;
 use Te4g\UserBundle\Te4gUserBundle;
 use Te4g\UserBundle\Tests\Fixtures\Domain\RecordingAccountMailer;
+use Te4g\UserBundle\Tests\Fixtures\Domain\RecordingEmailChangedListener;
 use Te4g\UserBundle\Tests\Fixtures\Domain\SwitchableAccountDeletionGuard;
 use Te4g\UserBundle\Tests\Fixtures\Persistence\TestUser;
 use Te4g\UserBundle\Tests\Fixtures\Persistence\TestUserRepository;
@@ -194,6 +196,9 @@ final class WebTestKernel extends Kernel
             $container->register(TestResetPasswordHelper::class, TestResetPasswordHelper::class)->setAutowired(true);
             $container->register(TestResetPasswordRequestRepository::class, TestResetPasswordRequestRepository::class);
             $container->register(RecordingAccountMailer::class, RecordingAccountMailer::class)->setPublic(true);
+            $container->register(RecordingEmailChangedListener::class, RecordingEmailChangedListener::class)
+                ->addTag('kernel.event_listener', ['event' => EmailChangedEvent::class])
+                ->setPublic(true);
             $container->register(SwitchableAccountDeletionGuard::class, SwitchableAccountDeletionGuard::class)
                 ->setAutoconfigured(true)
                 ->setPublic(true);

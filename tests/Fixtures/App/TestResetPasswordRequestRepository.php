@@ -9,6 +9,9 @@ use SymfonyCasts\Bundle\ResetPassword\Persistence\ResetPasswordRequestRepository
 
 final class TestResetPasswordRequestRepository implements ResetPasswordRequestRepositoryInterface
 {
+    /** @var list<object> */
+    public array $removedFor = [];
+
     public function createResetPasswordRequest(object $user, \DateTimeInterface $expiresAt, string $selector, string $hashedToken): ResetPasswordRequestInterface
     {
         throw new \LogicException('The in-memory helper creates requests directly.');
@@ -39,6 +42,12 @@ final class TestResetPasswordRequestRepository implements ResetPasswordRequestRe
 
     public function removeRequests(object $user): void
     {
+        $this->removedFor[] = $user;
+    }
+
+    public function clearActivity(): void
+    {
+        $this->removedFor = [];
     }
 
     public function removeExpiredResetPasswordRequests(): int

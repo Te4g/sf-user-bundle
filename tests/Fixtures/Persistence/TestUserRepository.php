@@ -22,6 +22,9 @@ use Te4g\UserBundle\Util\EmailNormalizer;
  */
 final class TestUserRepository extends ServiceEntityRepository implements AccountRepositoryInterface, UserProviderInterface
 {
+    /** @var list<AccountUserInterface> */
+    public array $savedUsers = [];
+
     private bool $removeShouldFail = false;
 
     public function __construct(ManagerRegistry $registry)
@@ -41,6 +44,7 @@ final class TestUserRepository extends ServiceEntityRepository implements Accoun
 
     public function save(AccountUserInterface $user): void
     {
+        $this->savedUsers[] = $user;
         $this->entityManager()->persist($this->testUser($user));
         $this->entityManager()->flush();
     }
@@ -60,6 +64,11 @@ final class TestUserRepository extends ServiceEntityRepository implements Accoun
     public function failNextRemove(): void
     {
         $this->removeShouldFail = true;
+    }
+
+    public function clearActivity(): void
+    {
+        $this->savedUsers = [];
     }
 
     public function loadUserByIdentifier(string $identifier): UserInterface

@@ -20,8 +20,11 @@ use Symfony\Component\Security\Core\User\InMemoryUser;
 use Te4g\UserBundle\Configuration\UserBundleOptions;
 use Te4g\UserBundle\Contract\AccountMailerInterface;
 use Te4g\UserBundle\Controller\AccountController;
+use Te4g\UserBundle\Tests\Fixtures\App\TestResetPasswordRequestRepository;
+use Te4g\UserBundle\Tests\Fixtures\App\TestVerifyEmailHelper;
 use Te4g\UserBundle\Tests\Fixtures\App\WebTestKernel;
 use Te4g\UserBundle\Tests\Fixtures\Domain\RecordingAccountMailer;
+use Te4g\UserBundle\Tests\Fixtures\Domain\RecordingEmailChangedListener;
 use Te4g\UserBundle\Tests\Fixtures\Domain\SwitchableAccountDeletionGuard;
 use Te4g\UserBundle\Tests\Fixtures\Persistence\TestUser;
 use Te4g\UserBundle\Tests\Fixtures\Persistence\TestUserRepository;
@@ -108,14 +111,69 @@ final class SelfAdministrationFlowTest extends BundleWebTestCase
         self::assertInstanceOf(RecordingAccountMailer::class, $mailer);
         self::assertCount(1, $mailer->messages);
         self::assertSame('email_change', $mailer->messages[0]['type']);
+        $signedUrl = $mailer->messages[0]['absoluteUrl'];
 
-        $client->request('GET', $mailer->messages[0]['absoluteUrl']);
+        $client->request('GET', $signedUrl);
 
         self::assertSame('/account', $client->getResponse()->headers->get('Location'));
+        self::assertSame([[
+            'signedUrl' => $signedUrl,
+            'userId' => (string) $user->getId(),
+            'userEmail' => 'new@example.test',
+        ]], $this->verifyEmailHelper()->validatedConfirmations);
         $confirmedUser = $this->repository()->findById((int) $user->getId());
         self::assertInstanceOf(TestUser::class, $confirmedUser);
         self::assertSame('new@example.test', $confirmedUser->getEmail());
         self::assertNull($confirmedUser->getPendingEmail());
+    }
+
+    public function testEmailConfirmationRejectsAnotherAccountIdWithoutAnyWorkflowSideEffect(): void
+    {
+        [$client, $principal] = $this->loginVerifiedUser('principal@example.test');
+        $otherAccount = $this->persistVerifiedUserWithContainer(self::getContainer(), 'other@example.test');
+        $otherAccount->setPendingEmail('other-pending@example.test');
+        $this->repository()->save($otherAccount);
+        $this->clearConfirmationActivity();
+        $mismatchedUrl = 'https://localhost/account/email-change?id='.$otherAccount->getId().'&signature=mismatch';
+
+        $client->request('GET', $mismatchedUrl);
+
+        self::assertSame(422, $client->getResponse()->getStatusCode());
+        $reloadedPrincipal = $this->repository()->findById((int) $principal->getId());
+        self::assertInstanceOf(TestUser::class, $reloadedPrincipal);
+        self::assertSame('principal@example.test', $reloadedPrincipal->getEmail());
+        self::assertNull($reloadedPrincipal->getPendingEmail());
+        $reloadedOther = $this->repository()->findById((int) $otherAccount->getId());
+        self::assertInstanceOf(TestUser::class, $reloadedOther);
+        self::assertSame('other@example.test', $reloadedOther->getEmail());
+        self::assertSame('other-pending@example.test', $reloadedOther->getPendingEmail());
+        $this->assertNoConfirmationSideEffects();
+    }
+
+    public function testRejectedEmailConfirmationForCurrentAccountIsSafeAndForwardsExactUri(): void
+    {
+        [$client, $user] = $this->loginVerifiedUser('active@example.test');
+        $user->setPendingEmail('pending@example.test');
+        $this->repository()->save($user);
+        $signedUrl = 'https://localhost/account/email-change?id='.$user->getId().'&signature=rejected-signature';
+        $this->clearConfirmationActivity();
+        $this->verifyEmailHelper()->rejectNextConfirmation();
+
+        $client->request('GET', $signedUrl);
+
+        self::assertSame(422, $client->getResponse()->getStatusCode());
+        $reloaded = $this->repository()->findById((int) $user->getId());
+        self::assertInstanceOf(TestUser::class, $reloaded);
+        self::assertSame('active@example.test', $reloaded->getEmail());
+        self::assertSame('pending@example.test', $reloaded->getPendingEmail());
+        self::assertSame([[
+            'signedUrl' => $signedUrl,
+            'userId' => (string) $user->getId(),
+            'userEmail' => 'pending@example.test',
+        ]], $this->verifyEmailHelper()->validatedConfirmations);
+        self::assertSame([], $this->repository()->savedUsers);
+        self::assertSame([], $this->resetRequestRepository()->removedFor);
+        self::assertSame([], $this->emailChangedListener()->events);
     }
 
     public function testProfileWrongPasswordReturnsUnprocessableWithoutChangingPendingEmail(): void
@@ -203,6 +261,8 @@ final class SelfAdministrationFlowTest extends BundleWebTestCase
         $session = $client->getRequest()->getSession();
         $session->set('survives-until-delete-success', 'present');
         $session->save();
+        $sessionIdBeforeDeletion = $session->getId();
+        self::assertNotSame('', $sessionIdBeforeDeletion);
 
         $client->submit($crawler->selectButton('Delete account')->form([
             'delete_account[currentPassword]' => 'Valid Current Password 42!',
@@ -211,8 +271,14 @@ final class SelfAdministrationFlowTest extends BundleWebTestCase
 
         self::assertSame('/login', $client->getResponse()->headers->get('Location'));
         self::assertNull($this->tokenStorage()->getToken());
-        self::assertFalse($session->has('survives-until-delete-success'));
+        $postDeletionSession = $client->getRequest()->getSession();
+        self::assertFalse($postDeletionSession->has('survives-until-delete-success'));
+        self::assertNotSame($sessionIdBeforeDeletion, $postDeletionSession->getId());
         self::assertNull($this->repository()->findById((int) $user->getId()));
+
+        $client->request('GET', '/account');
+        self::assertSame(302, $client->getResponse()->getStatusCode());
+        self::assertSame('http://localhost/login', $client->getResponse()->headers->get('Location'));
     }
 
     public function testRepositoryDeleteFailureKeepsAuthenticationAndSession(): void
@@ -350,5 +416,45 @@ final class SelfAdministrationFlowTest extends BundleWebTestCase
         self::assertInstanceOf(TokenStorageInterface::class, $tokenStorage);
 
         return $tokenStorage;
+    }
+
+    private function verifyEmailHelper(): TestVerifyEmailHelper
+    {
+        $helper = self::getContainer()->get(TestVerifyEmailHelper::class);
+        self::assertInstanceOf(TestVerifyEmailHelper::class, $helper);
+
+        return $helper;
+    }
+
+    private function resetRequestRepository(): TestResetPasswordRequestRepository
+    {
+        $repository = self::getContainer()->get(TestResetPasswordRequestRepository::class);
+        self::assertInstanceOf(TestResetPasswordRequestRepository::class, $repository);
+
+        return $repository;
+    }
+
+    private function emailChangedListener(): RecordingEmailChangedListener
+    {
+        $listener = self::getContainer()->get(RecordingEmailChangedListener::class);
+        self::assertInstanceOf(RecordingEmailChangedListener::class, $listener);
+
+        return $listener;
+    }
+
+    private function clearConfirmationActivity(): void
+    {
+        $this->repository()->clearActivity();
+        $this->verifyEmailHelper()->clearActivity();
+        $this->resetRequestRepository()->clearActivity();
+        $this->emailChangedListener()->clearActivity();
+    }
+
+    private function assertNoConfirmationSideEffects(): void
+    {
+        self::assertSame([], $this->verifyEmailHelper()->validatedConfirmations);
+        self::assertSame([], $this->repository()->savedUsers);
+        self::assertSame([], $this->resetRequestRepository()->removedFor);
+        self::assertSame([], $this->emailChangedListener()->events);
     }
 }
