@@ -27,12 +27,16 @@ final class ConfiguredAccountUserFactory implements AccountUserFactoryInterface
         if (
             !$reflection->isInstantiable()
             || !$reflection->implementsInterface(AccountUserInterface::class)
-            || (null !== $constructor && (!$constructor->isPublic() || 0 !== $constructor->getNumberOfParameters()))
+            || (null !== $constructor && (!$constructor->isPublic() || 0 !== $constructor->getNumberOfRequiredParameters()))
         ) {
             throw new InvalidAccountState('The configured account user cannot be created.');
         }
 
-        $user = $reflection->newInstance();
+        try {
+            $user = $reflection->newInstance();
+        } catch (\Throwable) {
+            throw new InvalidAccountState('The configured account user cannot be created.');
+        }
 
         if (!$user instanceof AccountUserInterface) {
             throw new InvalidAccountState('The configured account user cannot be created.');
