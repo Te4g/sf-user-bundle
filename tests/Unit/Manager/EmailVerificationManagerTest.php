@@ -12,8 +12,12 @@ use Te4g\UserBundle\Event\AccountVerifiedEvent;
 use Te4g\UserBundle\Exception\VerificationFailed;
 use Te4g\UserBundle\Manager\EmailVerificationManager;
 use Te4g\UserBundle\Tests\Fixtures\Domain\InMemoryAccountRepository;
+use Te4g\UserBundle\Tests\Fixtures\Domain\OperationTrace;
+use Te4g\UserBundle\Tests\Fixtures\Domain\RecordedEvents;
 use Te4g\UserBundle\Tests\Fixtures\Domain\RecordingAccountMailer;
 use Te4g\UserBundle\Tests\Fixtures\Domain\TestAccountUser;
+use Te4g\UserBundle\Tests\Fixtures\Domain\TracingAccountRepository;
+use Te4g\UserBundle\Tests\Fixtures\Domain\TracingAccountUser;
 
 final class EmailVerificationManagerTest extends TestCase
 {
@@ -42,18 +46,27 @@ final class EmailVerificationManagerTest extends TestCase
 
     public function testVerifyMarksTheLoadedUserVerifiedSavesItAndDispatchesEvent(): void
     {
-        $repository = new InMemoryAccountRepository();
-        $user = $this->user(9, 'user@example.com');
+        $trace = new OperationTrace();
+        $repository = new TracingAccountRepository($trace);
+        $user = $this->tracingUser($trace, 9, 'user@example.com');
         $repository->save($user);
-        $events = new RecordedEvents();
+        $trace->clear();
+        $helper = new SigningVerifyEmailHelper();
+        $events = new RecordedEvents($trace);
 
-        $verified = (new EmailVerificationManager($repository, new SigningVerifyEmailHelper(), new RecordingAccountMailer(), $events))
+        $verified = (new EmailVerificationManager($repository, $helper, new RecordingAccountMailer(), $events))
             ->verify('https://example.test/verify/9?token=secret', '9');
 
         self::assertSame($user, $verified);
         self::assertTrue($user->isVerified());
         self::assertCount(2, $repository->saved);
         self::assertSame([$user], $events->eventsOf(AccountVerifiedEvent::class));
+        self::assertSame([[
+            'signedUri' => 'https://example.test/verify/9?token=secret',
+            'userId' => '9',
+            'email' => 'user@example.com',
+        ]], $helper->validationAttempts);
+        self::assertSame(['load:9', 'set-verified', 'save', 'event:verified'], $trace->operations());
     }
 
     public function testVerifyRejectsAnUnknownAccountWithoutDisclosingTheSignedUri(): void
@@ -75,13 +88,17 @@ final class EmailVerificationManagerTest extends TestCase
 
     public function testVerifyTurnsAnInvalidSignatureIntoGenericVerificationFailure(): void
     {
-        $repository = new InMemoryAccountRepository();
-        $repository->save($this->user(9, 'user@example.com'));
+        $trace = new OperationTrace();
+        $repository = new TracingAccountRepository($trace);
+        $user = $this->tracingUser($trace, 9, 'user@example.com');
+        $repository->save($user);
+        $trace->clear();
+        $events = new RecordedEvents($trace);
         $manager = new EmailVerificationManager(
             $repository,
             new SigningVerifyEmailHelper(throwOnValidation: true),
             new RecordingAccountMailer(),
-            new RecordedEvents(),
+            $events,
         );
 
         try {
@@ -90,11 +107,25 @@ final class EmailVerificationManagerTest extends TestCase
         } catch (VerificationFailed $exception) {
             self::assertStringNotContainsString('token=secret', $exception->getMessage());
         }
+
+        self::assertFalse($user->isVerified());
+        self::assertCount(1, $repository->saved);
+        self::assertSame([], $events->eventsOf(AccountVerifiedEvent::class));
+        self::assertSame(['load:9'], $trace->operations());
     }
 
     private function user(int|string $id, string $email): TestAccountUser
     {
         $user = new TestAccountUser();
+        $user->setId($id);
+        $user->setEmail($email);
+
+        return $user;
+    }
+
+    private function tracingUser(OperationTrace $trace, int|string $id, string $email): TracingAccountUser
+    {
+        $user = new TracingAccountUser($trace);
         $user->setId($id);
         $user->setEmail($email);
 
@@ -106,6 +137,9 @@ final class SigningVerifyEmailHelper implements VerifyEmailHelperInterface
 {
     /** @var list<array{route: string, userId: string, email: string, extraParams: array<string, string>}> */
     public array $generatedSignatures = [];
+
+    /** @var list<array{signedUri: string, userId: string, email: string}> */
+    public array $validationAttempts = [];
 
     public function __construct(private readonly bool $throwOnValidation = false)
     {
@@ -126,6 +160,12 @@ final class SigningVerifyEmailHelper implements VerifyEmailHelperInterface
 
     public function validateEmailConfirmation(string $signedUrl, string $userId, string $userEmail): void
     {
+        $this->validationAttempts[] = [
+            'signedUri' => $signedUrl,
+            'userId' => $userId,
+            'email' => $userEmail,
+        ];
+
         if ($this->throwOnValidation) {
             throw new InvalidSignatureException();
         }
