@@ -10,7 +10,8 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Te4g\\UserBundle\\Tests\\": "tests/"
+            "Te4g\\UserBundle\\Tests\\": "tests/",
+            "Te4g\\UserBundle\\Tools\\": "tools/"
         }
     },
     "authors": [

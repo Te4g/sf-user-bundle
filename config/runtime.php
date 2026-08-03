@@ -7,6 +7,8 @@ use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigura
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_iterator;
 
+use TalesFromADev\Twig\Extra\Tailwind\TailwindExtension;
+use TalesFromADev\Twig\Extra\Tailwind\TailwindRuntime;
 use Te4g\UserBundle\Contract\AccountMailerInterface;
 use Te4g\UserBundle\Contract\AccountRepositoryInterface;
 use Te4g\UserBundle\Contract\AccountUserFactoryInterface;
@@ -44,6 +46,10 @@ return static function (ContainerConfigurator $container): void {
 
     $services
         ->set(EmailNormalizer::class)
+        ->set(TailwindExtension::class)
+            ->tag('twig.extension')
+        ->set(TailwindRuntime::class)
+            ->tag('twig.runtime')
         ->set(AccountMailer::class)
             ->autowire()
         ->set(AccountRequestLimiter::class)

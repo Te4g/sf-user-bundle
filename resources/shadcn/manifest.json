@@ -1,0 +1,305 @@
+{
+    "schema_version": 1,
+    "generated_by": "tools/ShadcnSnapshotSynchronizer.php",
+    "upstream": {
+        "package": "symfony/ux-toolkit",
+        "version": "3.3.0",
+        "reference": "f01228fe7d0e3bd26b1c27eb34b0cc1012a9b208",
+        "license": "MIT"
+    },
+    "recipes": [
+        "card",
+        "button",
+        "input",
+        "field",
+        "alert",
+        "separator",
+        "alert-dialog",
+        "spinner"
+    ],
+    "compatibility": "UX Toolkit 3.3 accepts one recipe per ux:install command; the fixed recipes are installed sequentially.",
+    "icons": {
+        "package": "@iconify-json/lucide",
+        "version": "1.2.121",
+        "license": "ISC",
+        "names": [
+            "circle-check",
+            "eye",
+            "eye-off",
+            "key-round",
+            "mail",
+            "trash-2",
+            "triangle-alert"
+        ]
+    },
+    "files": [
+        {
+            "path": "assets/controllers/alert_dialog_controller.js",
+            "source": "symfony/ux-toolkit:shadcn/alert-dialog",
+            "license": "MIT",
+            "sha256": "690edb84bfa9c2da1cf4d91388de7e80a8ba2036af50d0d969bb8e5eb924632d",
+            "local_modification": "Submit the existing deletion form, restore focus, and close safely on Turbo disconnect."
+        },
+        {
+            "path": "assets/icons/lucide/circle-check.svg",
+            "source": "@iconify-json/lucide@1.2.121",
+            "license": "ISC",
+            "sha256": "af470b2a75108bf802a8910f77702c2737730b01f6fda3f3f0e1b490b278b807"
+        },
+        {
+            "path": "assets/icons/lucide/eye-off.svg",
+            "source": "@iconify-json/lucide@1.2.121",
+            "license": "ISC",
+            "sha256": "706ff4cee52eff19fc9d49e63332aed3b5ad5362c0d6f39dd45271d24ed4183b"
+        },
+        {
+            "path": "assets/icons/lucide/eye.svg",
+            "source": "@iconify-json/lucide@1.2.121",
+            "license": "ISC",
+            "sha256": "fec9d0a50e97da0fc4f33f24adacaf97aa092882771d3015e04f718fdd1a7bd1"
+        },
+        {
+            "path": "assets/icons/lucide/key-round.svg",
+            "source": "@iconify-json/lucide@1.2.121",
+            "license": "ISC",
+            "sha256": "420c022fb12049c0df424d626065d0fff4bfd00f53fe1c5b22db342bfd969da5"
+        },
+        {
+            "path": "assets/icons/lucide/mail.svg",
+            "source": "@iconify-json/lucide@1.2.121",
+            "license": "ISC",
+            "sha256": "8b0a078cb705cee23754b0607d23cbbe7dbf5da6368e98c19223b62524f92b45"
+        },
+        {
+            "path": "assets/icons/lucide/trash-2.svg",
+            "source": "@iconify-json/lucide@1.2.121",
+            "license": "ISC",
+            "sha256": "37caec551239b2459890eea63217c67befa4abf0d6159156b809897dfe0b8f23"
+        },
+        {
+            "path": "assets/icons/lucide/triangle-alert.svg",
+            "source": "@iconify-json/lucide@1.2.121",
+            "license": "ISC",
+            "sha256": "7fa500078acb82d19a39568dd053275dabc11f1a9b534baed5acc687f08bd959"
+        },
+        {
+            "path": "templates/components/Alert.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/alert",
+            "license": "MIT",
+            "sha256": "bfb87d73d3b1392d73f2dc7a75b7bdf12e5b8cf2a2e6994f7d3d8efef451f8b9"
+        },
+        {
+            "path": "templates/components/Alert/Action.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/alert",
+            "license": "MIT",
+            "sha256": "c01bdae81dde1608bc3f19e708f7712539314bb3ac513327431ee91c2288daa2"
+        },
+        {
+            "path": "templates/components/Alert/Description.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/alert",
+            "license": "MIT",
+            "sha256": "3b26c4a036f68fc7236dc3ffd70ba9878fb94c7bb95e86f887a9d37d850f54c8"
+        },
+        {
+            "path": "templates/components/Alert/Title.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/alert",
+            "license": "MIT",
+            "sha256": "494c78b969ac3b964b4b35e40712a2a91d4a7e3520a8261a8e97048af30cf2af"
+        },
+        {
+            "path": "templates/components/AlertDialog.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/alert-dialog",
+            "license": "MIT",
+            "sha256": "31411fd1027108da6e72082bb203ffd003c50dac7a99e68836971f5f6d9ba663",
+            "local_modification": "Move the accessible name and description references to the native dialog element."
+        },
+        {
+            "path": "templates/components/AlertDialog/Action.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/alert-dialog",
+            "license": "MIT",
+            "sha256": "c791a45e5c7748a99deae742d1957470c4ba8b69b8f7c811a0cc4f3aca304179"
+        },
+        {
+            "path": "templates/components/AlertDialog/Cancel.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/alert-dialog",
+            "license": "MIT",
+            "sha256": "506a8b7b06e76d5aab08c614e8b5b5bfb3f512b54e04efa95b1b60a4e0ea4194"
+        },
+        {
+            "path": "templates/components/AlertDialog/Content.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/alert-dialog",
+            "license": "MIT",
+            "sha256": "59089e8f711efdb4827a143622caffa3194a05c9ea2babfe523d6d55e126d6c0",
+            "local_modification": "Apply aria-labelledby and aria-describedby to the native dialog element."
+        },
+        {
+            "path": "templates/components/AlertDialog/Description.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/alert-dialog",
+            "license": "MIT",
+            "sha256": "840866d0b8ca40cf633b97af8c920239c2b8c3502f3e90fdf81cc9794c94f310"
+        },
+        {
+            "path": "templates/components/AlertDialog/Footer.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/alert-dialog",
+            "license": "MIT",
+            "sha256": "1e5cbe2b81bc5aa02b740ea8567044c0d0ca3b5fc210d3498d79b8f290d06f02"
+        },
+        {
+            "path": "templates/components/AlertDialog/Header.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/alert-dialog",
+            "license": "MIT",
+            "sha256": "8215f7e4504a0e0a32b782fd7a089273763680777aa8e683c5d9a10a7d41d403"
+        },
+        {
+            "path": "templates/components/AlertDialog/Media.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/alert-dialog",
+            "license": "MIT",
+            "sha256": "a010642cc21a1b6981eebcdc5f27c2ede9f9720ec82d827e456921f72134d7a6"
+        },
+        {
+            "path": "templates/components/AlertDialog/Title.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/alert-dialog",
+            "license": "MIT",
+            "sha256": "516879f214a7d0dc63151ff5f5d04ced00c3f8978b38f75fb6bf4fadcbabbd9a"
+        },
+        {
+            "path": "templates/components/AlertDialog/Trigger.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/alert-dialog",
+            "license": "MIT",
+            "sha256": "4e92be809ea153a56d450a0ff470772411c54c135ee82b37aa675153e5a837cd"
+        },
+        {
+            "path": "templates/components/Button.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/button",
+            "license": "MIT",
+            "sha256": "d724b7b1ee09d0f82d2848c44917d5d4bfe697e4b96e9f6779e5bcce6995bbbb"
+        },
+        {
+            "path": "templates/components/Card.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/card",
+            "license": "MIT",
+            "sha256": "7e478c388cb4bb9fa5dae57bc51d8f50795e8c646188ff8b9cbda2d22846b676"
+        },
+        {
+            "path": "templates/components/Card/Action.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/card",
+            "license": "MIT",
+            "sha256": "6bf1a0227423239b2837d240d350d40975159a6b1aed5be3c685b94e665f987c"
+        },
+        {
+            "path": "templates/components/Card/Content.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/card",
+            "license": "MIT",
+            "sha256": "b09dcc83d4940dec263f40e2c6818e9a0f46913b77fffd3e742869d92709497d"
+        },
+        {
+            "path": "templates/components/Card/Description.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/card",
+            "license": "MIT",
+            "sha256": "fac0954c732e433b8160f1fb0d25a4b0094906c7852bcc599212be53ff1e84c7"
+        },
+        {
+            "path": "templates/components/Card/Footer.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/card",
+            "license": "MIT",
+            "sha256": "327b630545075d6da354e3e1095807b6bb8257434c49acade370aa115e481663"
+        },
+        {
+            "path": "templates/components/Card/Header.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/card",
+            "license": "MIT",
+            "sha256": "dcb03c0fb4460ebc9d797197d7bc09ed7d0990e821fcdc943a0b0024071d587e"
+        },
+        {
+            "path": "templates/components/Card/Title.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/card",
+            "license": "MIT",
+            "sha256": "ea7e4d04a7954a390d20fbd55146aa2846019a01ce40e4d6de08144161439a28"
+        },
+        {
+            "path": "templates/components/Field.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/field",
+            "license": "MIT",
+            "sha256": "100f69204acbbd56fc99a306bd989f4a2fa7f4e8d45e39e0e556e25dfd2f2656"
+        },
+        {
+            "path": "templates/components/Field/Content.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/field",
+            "license": "MIT",
+            "sha256": "dbcc0bfb7c2308cd404b7da2624d7ab52b01b4df60d728b26409c10055b88a0f"
+        },
+        {
+            "path": "templates/components/Field/Description.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/field",
+            "license": "MIT",
+            "sha256": "3f6135af0aab8cba4a051634b931c085c5bee7abb889514f5095c3f1344424a2"
+        },
+        {
+            "path": "templates/components/Field/Error.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/field",
+            "license": "MIT",
+            "sha256": "f1f65b74c8d1b5a0e96f3793b3e80acb24c2e9f4d9be4b5c9b0665c88311826c"
+        },
+        {
+            "path": "templates/components/Field/Group.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/field",
+            "license": "MIT",
+            "sha256": "adc7053ebf58e65711345d53463220a21fdcf9dcd453508436b891d18f220234"
+        },
+        {
+            "path": "templates/components/Field/Label.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/field",
+            "license": "MIT",
+            "sha256": "aa4dff142317b1650b16e1787fc29d0cdcd763bd571dd1234d15241c931091a8"
+        },
+        {
+            "path": "templates/components/Field/Legend.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/field",
+            "license": "MIT",
+            "sha256": "6a445a70cfc4e4a4d729066e5b44d286ad0e95ad74e8074fd0df81e57ac0df6f"
+        },
+        {
+            "path": "templates/components/Field/Separator.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/field",
+            "license": "MIT",
+            "sha256": "8e306d1d82dd6ad8f3687bfb4df5c8d8c60309577f5984ef318180d662c08ddd"
+        },
+        {
+            "path": "templates/components/Field/Set.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/field",
+            "license": "MIT",
+            "sha256": "ef50e20477ae39f633320971ac86129a529616581effe0ca7f204dc2d8af1594"
+        },
+        {
+            "path": "templates/components/Field/Title.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/field",
+            "license": "MIT",
+            "sha256": "4c07d2a6d14d3a197cb4f549149ff9e599f1507ea3bc6de32752de9307c35f06"
+        },
+        {
+            "path": "templates/components/Input.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/input",
+            "license": "MIT",
+            "sha256": "0394d13cbb70eaac6012f30c3b2e47d33c46becd2484948ff35f6f37fbdd21c0"
+        },
+        {
+            "path": "templates/components/Label.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/label",
+            "license": "MIT",
+            "sha256": "0d330dcea0e0370b73efc5eff2ce390bf19a45439fd2e96b5461fea34dbe3012"
+        },
+        {
+            "path": "templates/components/Separator.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/separator",
+            "license": "MIT",
+            "sha256": "22662b249a8f84863a252d7153874b8e9ab20908020927dc5a221ba678346603"
+        },
+        {
+            "path": "templates/components/Spinner.html.twig",
+            "source": "symfony/ux-toolkit:shadcn/spinner",
+            "license": "MIT",
+            "sha256": "ccf4739c595f27460b1e50bfaa8c4d52b01d63472659db6437510af5ab75c20c",
+            "local_modification": "Inline the spinner SVG to keep the seven-icon allowlist fully offline."
+        }
+    ]
+}

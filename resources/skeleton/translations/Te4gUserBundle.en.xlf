@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xliff xmlns="urn:oasis:names:tc:xliff:document:1.2" version="1.2">
+  <file source-language="en" target-language="en" datatype="plaintext" original="file.ext">
+    <body>
+      <trans-unit id="form.email"><source>form.email</source><target>Email address</target></trans-unit>
+      <trans-unit id="form.password"><source>form.password</source><target>Password</target></trans-unit>
+      <trans-unit id="form.password_confirmation"><source>form.password_confirmation</source><target>Confirm password</target></trans-unit>
+      <trans-unit id="form.password_mismatch"><source>form.password_mismatch</source><target>The passwords do not match.</target></trans-unit>
+      <trans-unit id="form.new_email"><source>form.new_email</source><target>New email address</target></trans-unit>
+      <trans-unit id="form.current_password"><source>form.current_password</source><target>Current password</target></trans-unit>
+      <trans-unit id="form.new_password"><source>form.new_password</source><target>New password</target></trans-unit>
+      <trans-unit id="form.delete_confirmation"><source>form.delete_confirmation</source><target>I understand that my account will be permanently deleted.</target></trans-unit>
+      <trans-unit id="form.delete_confirmation_required"><source>form.delete_confirmation_required</source><target>You must confirm account deletion.</target></trans-unit>
+      <trans-unit id="form.error_summary"><source>form.error_summary</source><target>Please correct the errors below.</target></trans-unit>
+      <trans-unit id="form.submitting"><source>form.submitting</source><target>Submitting</target></trans-unit>
+      <trans-unit id="password.show"><source>password.show</source><target>Show password</target></trans-unit>
+      <trans-unit id="password.hide"><source>password.hide</source><target>Hide password</target></trans-unit>
+      <trans-unit id="registration.title"><source>registration.title</source><target>Create your account</target></trans-unit>
+      <trans-unit id="registration.status"><source>registration.status</source><target>Enter your details to register.</target></trans-unit>
+      <trans-unit id="registration.submit"><source>registration.submit</source><target>Register</target></trans-unit>
+      <trans-unit id="login.title"><source>login.title</source><target>Sign in</target></trans-unit>
+      <trans-unit id="login.failed"><source>login.failed</source><target>Unable to sign in with those credentials.</target></trans-unit>
+      <trans-unit id="login.submit"><source>login.submit</source><target>Sign in</target></trans-unit>
+      <trans-unit id="login.magic_link_title"><source>login.magic_link_title</source><target>Email me a sign-in link</target></trans-unit>
+      <trans-unit id="login.magic_link_submit"><source>login.magic_link_submit</source><target>Send sign-in link</target></trans-unit>
+      <trans-unit id="login_link.title"><source>login_link.title</source><target>Confirm sign in</target></trans-unit>
+      <trans-unit id="login_link.status"><source>login_link.status</source><target>Continue to sign in securely.</target></trans-unit>
+      <trans-unit id="login_link.submit"><source>login_link.submit</source><target>Continue</target></trans-unit>
+      <trans-unit id="check_email.title"><source>check_email.title</source><target>Check your email</target></trans-unit>
+      <trans-unit id="check_email.status"><source>check_email.status</source><target>If an eligible account exists, an email has been sent.</target></trans-unit>
+      <trans-unit id="check_email.resend"><source>check_email.resend</source><target>Resend verification email</target></trans-unit>
+      <trans-unit id="password_request.title"><source>password_request.title</source><target>Reset your password</target></trans-unit>
+      <trans-unit id="password_request.status"><source>password_request.status</source><target>Enter your email address to request a reset link.</target></trans-unit>
+      <trans-unit id="password_request.submit"><source>password_request.submit</source><target>Send reset link</target></trans-unit>
+      <trans-unit id="password_reset.title"><source>password_reset.title</source><target>Choose a new password</target></trans-unit>
+      <trans-unit id="password_reset.failed"><source>password_reset.failed</source><target>This reset link is invalid or has expired.</target></trans-unit>
+      <trans-unit id="password_reset.submit"><source>password_reset.submit</source><target>Save password</target></trans-unit>
+      <trans-unit id="account.title"><source>account.title</source><target>Your account</target></trans-unit>
+      <trans-unit id="account.active_email"><source>account.active_email</source><target>Active email address</target></trans-unit>
+      <trans-unit id="account.pending_email"><source>account.pending_email</source><target>Pending email address</target></trans-unit>
+      <trans-unit id="account.navigation"><source>account.navigation</source><target>Account settings</target></trans-unit>
+      <trans-unit id="account.profile_action"><source>account.profile_action</source><target>Change email</target></trans-unit>
+      <trans-unit id="account.password_action"><source>account.password_action</source><target>Change password</target></trans-unit>
+      <trans-unit id="account.delete_title"><source>account.delete_title</source><target>Delete account</target></trans-unit>
+      <trans-unit id="account.delete_copy"><source>account.delete_copy</source><target>Permanently remove your account and account data.</target></trans-unit>
+      <trans-unit id="account.delete_confirm_title"><source>account.delete_confirm_title</source><target>Delete your account permanently?</target></trans-unit>
+      <trans-unit id="account.delete_confirm_copy"><source>account.delete_confirm_copy</source><target>This action cannot be undone. Your signed-in session will end immediately.</target></trans-unit>
+      <trans-unit id="account.delete_cancel"><source>account.delete_cancel</source><target>Keep account</target></trans-unit>
+      <trans-unit id="account.delete_submit"><source>account.delete_submit</source><target>Delete account</target></trans-unit>
+      <trans-unit id="account.deletion_failed"><source>account.deletion_failed</source><target>Your account could not be deleted.</target></trans-unit>
+      <trans-unit id="profile.title"><source>profile.title</source><target>Change your email address</target></trans-unit>
+      <trans-unit id="profile.change_failed"><source>profile.change_failed</source><target>Your email address could not be changed.</target></trans-unit>
+      <trans-unit id="profile.submit"><source>profile.submit</source><target>Save profile</target></trans-unit>
+      <trans-unit id="password_change.title"><source>password_change.title</source><target>Change your password</target></trans-unit>
+      <trans-unit id="password_change.failed"><source>password_change.failed</source><target>Your password could not be changed.</target></trans-unit>
+      <trans-unit id="password_change.submit"><source>password_change.submit</source><target>Change password</target></trans-unit>
+      <trans-unit id="email.verification.subject"><source>email.verification.subject</source><target>Verify your email address</target></trans-unit>
+      <trans-unit id="email.verification.heading"><source>email.verification.heading</source><target>Verify your email address</target></trans-unit>
+      <trans-unit id="email.verification.copy"><source>email.verification.copy</source><target>Use the link below to verify your account.</target></trans-unit>
+      <trans-unit id="email.verification.action"><source>email.verification.action</source><target>Verify email</target></trans-unit>
+      <trans-unit id="email.magic_link.subject"><source>email.magic_link.subject</source><target>Your sign-in link</target></trans-unit>
+      <trans-unit id="email.magic_link.heading"><source>email.magic_link.heading</source><target>Sign in to your account</target></trans-unit>
+      <trans-unit id="email.magic_link.copy"><source>email.magic_link.copy</source><target>Use the secure link below to sign in.</target></trans-unit>
+      <trans-unit id="email.magic_link.action"><source>email.magic_link.action</source><target>Sign in</target></trans-unit>
+      <trans-unit id="email.password_reset.subject"><source>email.password_reset.subject</source><target>Reset your password</target></trans-unit>
+      <trans-unit id="email.password_reset.heading"><source>email.password_reset.heading</source><target>Reset your password</target></trans-unit>
+      <trans-unit id="email.password_reset.copy"><source>email.password_reset.copy</source><target>Use the secure link below to choose a new password.</target></trans-unit>
+      <trans-unit id="email.password_reset.action"><source>email.password_reset.action</source><target>Reset password</target></trans-unit>
+      <trans-unit id="email.email_change.subject"><source>email.email_change.subject</source><target>Confirm your new email address</target></trans-unit>
+      <trans-unit id="email.email_change.heading"><source>email.email_change.heading</source><target>Confirm your new email address</target></trans-unit>
+      <trans-unit id="email.email_change.copy"><source>email.email_change.copy</source><target>Use the secure link below to confirm this email address.</target></trans-unit>
+      <trans-unit id="email.email_change.action"><source>email.email_change.action</source><target>Confirm email</target></trans-unit>
+    </body>
+  </file>
+</xliff>

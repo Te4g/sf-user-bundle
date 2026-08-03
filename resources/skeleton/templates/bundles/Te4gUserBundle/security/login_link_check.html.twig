@@ -1,0 +1,10 @@
+{% trans_default_domain 'Te4gUserBundle' %}
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{{ 'login_link.title'|trans }}</title></head>
+<body class="min-h-screen bg-background text-foreground"><main class="mx-auto flex min-h-screen w-full max-w-md items-center px-4 py-12">
+<twig:Card class="w-full shadow-sm"><twig:Card:Header><twig:Card:Title><h1 class="text-xl">{{ 'login_link.title'|trans }}</h1></twig:Card:Title><twig:Card:Description>{{ 'login_link.status'|trans }}</twig:Card:Description></twig:Card:Header><twig:Card:Content>
+<div class="sr-only" aria-live="polite">{{ 'login_link.status'|trans }}</div>
+<form method="post" action="{{ path('te4g_user_login_link_check') }}" class="space-y-4">
+{% for name, value in login_link_parameters %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+<input type="hidden" name="_csrf_token" value="{{ csrf_token('login_link_check') }}">
+<twig:Button type="submit" class="w-full" data-turbo-submits-with="{{ 'form.submitting'|trans }}"><twig:ux:icon name="lucide:key-round" />{{ 'login_link.submit'|trans }}</twig:Button>
+</form></twig:Card:Content></twig:Card></main></body></html>
