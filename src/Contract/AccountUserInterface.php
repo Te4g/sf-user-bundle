@@ -7,7 +7,7 @@ namespace Te4g\UserBundle\Contract;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 
-interface AccountUserInterface extends UserInterface, PasswordAuthenticatedUserInterface
+interface AccountUserInterface extends PasswordAuthenticatedUserInterface, UserInterface
 {
     public function getId(): int|string|null;
 

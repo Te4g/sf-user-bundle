@@ -16,6 +16,7 @@ final class EmailNormalizerTest extends TestCase
         self::assertSame($expected, (new EmailNormalizer())->normalize($input));
     }
 
+    /** @return iterable<array{string, string}> */
     public static function emails(): iterable
     {
         yield [' User@Example.COM ', 'user@example.com'];

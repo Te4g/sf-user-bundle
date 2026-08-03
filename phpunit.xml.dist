@@ -7,6 +7,10 @@
          failOnRisky="true"
          failOnWarning="true"
          xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd">
+    <php>
+        <env name="KERNEL_CLASS" value="Te4g\UserBundle\Tests\Fixtures\App\WebTestKernel"/>
+        <env name="APP_DEBUG" value="0"/>
+    </php>
     <testsuites>
         <testsuite name="Te4g User Bundle">
             <directory>tests</directory>

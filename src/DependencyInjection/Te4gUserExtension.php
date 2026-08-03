@@ -19,7 +19,9 @@ final class Te4gUserExtension extends Extension
         $config = $this->processConfiguration(new Configuration(), $configs);
 
         $container->setParameter('te4g_user.config', $config);
+        $container->setParameter('te4g_user.user_class', $config['user_class']);
         $container->setParameter('te4g_user.redirects.login_success', $config['redirects']['login_success']);
+        $container->setAlias('te4g_user.configured_account_repository', $config['account_repository']);
 
         $loader = new PhpFileLoader($container, new FileLocator(__DIR__.'/../../config'));
         $loader->load('services.php');
