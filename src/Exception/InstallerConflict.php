@@ -29,6 +29,11 @@ final class InstallerConflict extends \RuntimeException
         return new self('Invalid installer marker region.', 'invalid-marker');
     }
 
+    public static function invalidProjectConfiguration(): self
+    {
+        return new self('Invalid installer project configuration.', 'invalid-project-configuration');
+    }
+
     public static function installerLocked(): self
     {
         return new self('Installer conflict.', 'installer-locked');

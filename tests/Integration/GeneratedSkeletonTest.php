@@ -30,9 +30,9 @@ use Te4g\UserBundle\Te4gUserBundle;
 
 final class GeneratedSkeletonTest extends TestCase
 {
-    private const string RESET_REQUEST_CLASS = 'App\Entity\ResetPasswordRequest';
-    private const string USER_CLASS = 'App\Entity\User';
-    private const string USER_REPOSITORY_CLASS = 'App\Repository\UserRepository';
+    private const string RESET_REQUEST_CLASS = 'GeneratedApp\Entity\ResetPasswordRequest';
+    private const string USER_CLASS = 'GeneratedApp\Entity\User';
+    private const string USER_REPOSITORY_CLASS = 'GeneratedApp\Repository\UserRepository';
 
     private string $projectDir;
 
@@ -49,6 +49,9 @@ final class GeneratedSkeletonTest extends TestCase
 
     public function testGeneratedApplicationLintsLoadsMetadataCompilesSecurityAndResolvesRoutes(): void
     {
+        file_put_contents($this->projectDir.'/composer.json', <<<'JSON'
+            {"autoload":{"psr-4":{"GeneratedApp\\":"./src/"}}}
+            JSON);
         $files = (new SkeletonRenderer())->renderAll(ProjectLayout::at($this->projectDir));
         $this->write($files);
 
@@ -117,7 +120,7 @@ final class GeneratedSkeletonTest extends TestCase
         }
 
         self::assertSame([
-            'request_password_repository' => 'App\Repository\ResetPasswordRequestRepository',
+            'request_password_repository' => 'GeneratedApp\Repository\ResetPasswordRequestRepository',
             'lifetime' => 3600,
             'throttle_limit' => 3600,
             'enable_garbage_collection' => true,
@@ -284,17 +287,17 @@ final class GeneratedSkeletonKernel extends Kernel
                         'GeneratedApp' => [
                             'type' => 'attribute',
                             'dir' => $projectDirectory.'/src/Entity',
-                            'prefix' => 'App\\Entity',
+                            'prefix' => 'GeneratedApp\\Entity',
                             'alias' => 'GeneratedApp',
                         ],
                     ],
                 ],
             ]);
-            $container->register('App\Repository\UserRepository', 'App\Repository\UserRepository')
+            $container->register('GeneratedApp\Repository\UserRepository', 'GeneratedApp\Repository\UserRepository')
                 ->setAutowired(true)
                 ->setAutoconfigured(true)
                 ->setPublic(true);
-            $container->register('App\Repository\ResetPasswordRequestRepository', 'App\Repository\ResetPasswordRequestRepository')
+            $container->register('GeneratedApp\Repository\ResetPasswordRequestRepository', 'GeneratedApp\Repository\ResetPasswordRequestRepository')
                 ->setAutowired(true)
                 ->setAutoconfigured(true)
                 ->setPublic(true);
