@@ -15,13 +15,16 @@ use SymfonyCasts\Bundle\ResetPassword\Model\ResetPasswordRequestInterface;
 use SymfonyCasts\Bundle\ResetPassword\Model\ResetPasswordToken;
 use SymfonyCasts\Bundle\ResetPassword\Persistence\ResetPasswordRequestRepositoryInterface;
 use SymfonyCasts\Bundle\ResetPassword\ResetPasswordHelperInterface;
+use Te4g\UserBundle\Contract\AccountRepositoryInterface;
 use Te4g\UserBundle\Event\PasswordChangedEvent;
 use Te4g\UserBundle\Event\PasswordChangeOrigin;
 use Te4g\UserBundle\Exception\PasswordResetFailed;
 use Te4g\UserBundle\Manager\PasswordResetManager;
 use Te4g\UserBundle\Tests\Fixtures\Domain\InMemoryAccountRepository;
+use Te4g\UserBundle\Tests\Fixtures\Domain\OperationTrace;
 use Te4g\UserBundle\Tests\Fixtures\Domain\RecordingAccountMailer;
 use Te4g\UserBundle\Tests\Fixtures\Domain\TestAccountUser;
+use Te4g\UserBundle\Tests\Fixtures\Domain\TracingAccountRepository;
 
 final class PasswordResetManagerTest extends TestCase
 {
@@ -81,19 +84,32 @@ final class PasswordResetManagerTest extends TestCase
 
     public function testResetHashesSavesInvalidatesEveryRequestAndDispatchesResetEvent(): void
     {
+        $trace = new OperationTrace();
+        $repository = new TracingAccountRepository($trace);
+        $resetHelper = new ResetTestHelper($trace);
+        $resetRequests = new ResetTestRequestRepository($trace);
+        $hasher = new ResetTestPasswordHasher($trace);
+        $events = new ResetTestEventDispatcher($trace);
         $user = $this->user('user@example.com');
-        $this->resetHelper->resolvedUsers['valid-token'] = $user;
+        $resetHelper->resolvedUsers['valid-token'] = $user;
 
-        $resolved = $this->manager()->reset('valid-token', 'new secure password');
+        $resolved = $this->manager(
+            repository: $repository,
+            resetHelper: $resetHelper,
+            resetRequestRepository: $resetRequests,
+            passwordHasher: $hasher,
+            events: $events,
+        )->reset('valid-token', 'new secure password');
 
         self::assertSame($user, $resolved);
         self::assertSame('NEW_PASSWORD_HASH', $user->getPassword());
-        self::assertSame([[$user, 'new secure password']], $this->passwordHasher->hashedPasswords);
-        self::assertSame([$user], $this->repository->saved);
-        self::assertSame(['valid-token'], $this->resetHelper->removedTokens);
-        self::assertSame([$user], $this->resetRequestRepository->removedFor);
-        self::assertCount(1, $this->events->events);
-        $event = $this->events->events[0];
+        self::assertSame([[$user, 'new secure password']], $hasher->hashedPasswords);
+        self::assertSame([$user], $repository->saved);
+        self::assertSame(['valid-token'], $resetHelper->removedTokens);
+        self::assertSame([$user], $resetRequests->removedFor);
+        self::assertSame(['hash', 'save', 'remove-used-token', 'remove-account-resets', 'event'], $trace->operations());
+        self::assertCount(1, $events->events);
+        $event = $events->events[0];
         self::assertInstanceOf(PasswordChangedEvent::class, $event);
         self::assertSame($user, $event->getUser());
         self::assertSame(PasswordChangeOrigin::Reset, $event->getOrigin());
@@ -117,6 +133,62 @@ final class PasswordResetManagerTest extends TestCase
         self::assertSame([], $this->passwordHasher->hashedPasswords);
         self::assertSame([], $this->repository->saved);
         self::assertSame([], $this->resetHelper->removedTokens);
+        self::assertSame([], $this->resetRequestRepository->removedFor);
+        self::assertSame([], $this->events->events);
+    }
+
+    public function testResetTokenIsRedactedFromTheTranslatedExceptionTrace(): void
+    {
+        $previousExceptionArgsSetting = ini_get('zend.exception_ignore_args');
+        ini_set('zend.exception_ignore_args', '0');
+        $this->resetHelper->validationFailure = new ResetTestSensitiveException('invalid token');
+
+        try {
+            $this->manager()->reset('trace-secret-token', 'new secret password');
+            self::fail('An invalid reset token must fail.');
+        } catch (PasswordResetFailed $exception) {
+            $resetFrame = null;
+
+            foreach ($exception->getTrace() as $frame) {
+                if (PasswordResetManager::class === ($frame['class'] ?? null) && 'reset' === $frame['function']) {
+                    $resetFrame = $frame;
+                    break;
+                }
+            }
+
+            self::assertNotNull($resetFrame);
+
+            if (!isset($resetFrame['args'])) {
+                self::fail('The reset trace frame must expose redacted arguments for this test.');
+            }
+
+            self::assertInstanceOf(\SensitiveParameterValue::class, $resetFrame['args'][0]);
+            self::assertInstanceOf(\SensitiveParameterValue::class, $resetFrame['args'][1]);
+        } finally {
+            if (false !== $previousExceptionArgsSetting) {
+                ini_set('zend.exception_ignore_args', $previousExceptionArgsSetting);
+            }
+        }
+    }
+
+    public function testUsedTokenCleanupFailureIsTranslatedAfterPasswordSaveWithoutFurtherSideEffects(): void
+    {
+        $user = $this->user('user@example.com');
+        $this->resetHelper->resolvedUsers['valid-token'] = $user;
+        $this->resetHelper->removalFailure = new ResetTestSensitiveException('cleanup failed for valid-token');
+
+        try {
+            $this->manager()->reset('valid-token', 'new secure password');
+            self::fail('A reset-token cleanup failure must be translated.');
+        } catch (PasswordResetFailed $exception) {
+            self::assertStringNotContainsString('valid-token', $exception->getMessage());
+            self::assertStringNotContainsString('new secure password', $exception->getMessage());
+            self::assertNull($exception->getPrevious());
+        }
+
+        self::assertSame('NEW_PASSWORD_HASH', $user->getPassword());
+        self::assertSame([$user], $this->repository->saved);
+        self::assertSame(['valid-token'], $this->resetHelper->removedTokens);
         self::assertSame([], $this->resetRequestRepository->removedFor);
         self::assertSame([], $this->events->events);
     }
@@ -156,16 +228,21 @@ final class PasswordResetManagerTest extends TestCase
         self::assertSame([], $this->mailer->messages);
     }
 
-    private function manager(): PasswordResetManager
-    {
+    private function manager(
+        ?AccountRepositoryInterface $repository = null,
+        ?ResetTestHelper $resetHelper = null,
+        ?ResetTestRequestRepository $resetRequestRepository = null,
+        ?ResetTestPasswordHasher $passwordHasher = null,
+        ?ResetTestEventDispatcher $events = null,
+    ): PasswordResetManager {
         return new PasswordResetManager(
-            $this->repository,
-            $this->resetHelper,
-            $this->resetRequestRepository,
-            $this->passwordHasher,
+            $repository ?? $this->repository,
+            $resetHelper ?? $this->resetHelper,
+            $resetRequestRepository ?? $this->resetRequestRepository,
+            $passwordHasher ?? $this->passwordHasher,
             $this->urlGenerator,
             $this->mailer,
-            $this->events,
+            $events ?? $this->events,
         );
     }
 
@@ -193,6 +270,12 @@ final class ResetTestHelper implements ResetPasswordHelperInterface
 
     public ?ResetPasswordExceptionInterface $validationFailure = null;
 
+    public ?ResetPasswordExceptionInterface $removalFailure = null;
+
+    public function __construct(private readonly ?OperationTrace $trace = null)
+    {
+    }
+
     public function generateResetToken(object $user): ResetPasswordToken
     {
         $this->generatedFor[] = $user;
@@ -215,7 +298,12 @@ final class ResetTestHelper implements ResetPasswordHelperInterface
 
     public function removeResetRequest(string $fullToken): void
     {
+        $this->trace?->record('remove-used-token');
         $this->removedTokens[] = $fullToken;
+
+        if (null !== $this->removalFailure) {
+            throw $this->removalFailure;
+        }
     }
 
     public function getTokenLifetime(): int
@@ -228,6 +316,10 @@ final class ResetTestRequestRepository implements ResetPasswordRequestRepository
 {
     /** @var list<object> */
     public array $removedFor = [];
+
+    public function __construct(private readonly ?OperationTrace $trace = null)
+    {
+    }
 
     public function createResetPasswordRequest(object $user, \DateTimeInterface $expiresAt, string $selector, string $hashedToken): ResetPasswordRequestInterface
     {
@@ -266,6 +358,7 @@ final class ResetTestRequestRepository implements ResetPasswordRequestRepository
 
     public function removeRequests(object $user): void
     {
+        $this->trace?->record('remove-account-resets');
         $this->removedFor[] = $user;
     }
 }
@@ -275,8 +368,13 @@ final class ResetTestPasswordHasher implements UserPasswordHasherInterface
     /** @var list<array{PasswordAuthenticatedUserInterface, string}> */
     public array $hashedPasswords = [];
 
+    public function __construct(private readonly ?OperationTrace $trace = null)
+    {
+    }
+
     public function hashPassword(PasswordAuthenticatedUserInterface $user, #[\SensitiveParameter] string $plainPassword): string
     {
+        $this->trace?->record('hash');
         $this->hashedPasswords[] = [$user, $plainPassword];
 
         return 'NEW_PASSWORD_HASH';
@@ -333,8 +431,13 @@ final class ResetTestEventDispatcher implements EventDispatcherInterface
     /** @var list<object> */
     public array $events = [];
 
+    public function __construct(private readonly ?OperationTrace $trace = null)
+    {
+    }
+
     public function dispatch(object $event, ?string $eventName = null): object
     {
+        $this->trace?->record('event');
         $this->events[] = $event;
 
         return $event;

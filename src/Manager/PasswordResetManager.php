@@ -55,8 +55,10 @@ final readonly class PasswordResetManager
         $this->mailer->sendPasswordReset($user, $absoluteUrl);
     }
 
-    public function reset(string $token, #[\SensitiveParameter] string $plainPassword): AccountUserInterface
-    {
+    public function reset(
+        #[\SensitiveParameter] string $token,
+        #[\SensitiveParameter] string $plainPassword,
+    ): AccountUserInterface {
         try {
             $user = $this->resetPasswordHelper->validateTokenAndFetchUser($token);
         } catch (ResetPasswordExceptionInterface) {
@@ -69,7 +71,13 @@ final readonly class PasswordResetManager
 
         $user->setPassword($this->passwordHasher->hashPassword($user, $plainPassword));
         $this->repository->save($user);
-        $this->resetPasswordHelper->removeResetRequest($token);
+
+        try {
+            $this->resetPasswordHelper->removeResetRequest($token);
+        } catch (ResetPasswordExceptionInterface) {
+            throw new PasswordResetFailed();
+        }
+
         $this->resetPasswordRequestRepository->removeRequests($user);
         $this->eventDispatcher->dispatch(new PasswordChangedEvent($user, PasswordChangeOrigin::Reset));
 
