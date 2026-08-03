@@ -42,6 +42,7 @@ final class MagicLinkManagerTest extends TestCase
         ?TestAccountUser $user,
         int $expectedMagicMails,
         int $expectedVerificationMails,
+        int $expectedLoginLinks,
     ): void {
         if (null !== $user) {
             $this->repository->save($user);
@@ -51,14 +52,16 @@ final class MagicLinkManagerTest extends TestCase
 
         self::assertCount($expectedMagicMails, $this->messagesOfType('magic_link'));
         self::assertCount($expectedVerificationMails, $this->messagesOfType('verification'));
+        self::assertCount($expectedLoginLinks, $this->loginLinkHandler->createdFor);
+        self::assertSame(1 === $expectedLoginLinks ? [$user] : [], $this->loginLinkHandler->createdFor);
     }
 
-    /** @return iterable<string, array{?TestAccountUser, int, int}> */
+    /** @return iterable<string, array{?TestAccountUser, int, int, int}> */
     public static function accountStates(): iterable
     {
-        yield 'unknown' => [null, 0, 0];
-        yield 'unverified' => [self::user(17, false), 0, 1];
-        yield 'verified' => [self::user(17, true), 1, 0];
+        yield 'unknown' => [null, 0, 0, 0];
+        yield 'unverified' => [self::user(17, false), 0, 1, 0];
+        yield 'verified' => [self::user(17, true), 1, 0, 1];
     }
 
     public function testRequestNormalizesBeforeLookup(): void

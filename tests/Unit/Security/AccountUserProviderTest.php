@@ -99,6 +99,28 @@ final class AccountUserProviderTest extends TestCase
         }
     }
 
+    public function testRefreshRejectsContractUserOutsideConfiguredClassBeforeRepositoryAccess(): void
+    {
+        $trace = new OperationTrace();
+        $provider = $this->provider(new TracingAccountRepository($trace));
+        $user = new TestUser();
+        $user->setId(27);
+        $user->setEmail('outside@example.com');
+        $user->setPassword('unchanged-hash');
+        $exception = null;
+
+        try {
+            $provider->refreshUser($user);
+        } catch (\Throwable $caught) {
+            $exception = $caught;
+        }
+
+        self::assertSame([], $trace->operations());
+        self::assertSame('unchanged-hash', $user->getPassword());
+        self::assertInstanceOf(UnsupportedUserException::class, $exception);
+        self::assertStringNotContainsString('outside@example.com', $exception->getMessage());
+    }
+
     public function testSupportsOnlyConfiguredAccountClassAndItsAccountSubclasses(): void
     {
         $provider = $this->provider(new TracingAccountRepository(new OperationTrace()));
@@ -139,6 +161,28 @@ final class AccountUserProviderTest extends TestCase
         }
 
         self::assertSame([], $trace->operations());
+    }
+
+    public function testPasswordUpgradeRejectsContractUserOutsideConfiguredClassWithoutMutationOrSave(): void
+    {
+        $trace = new OperationTrace();
+        $provider = $this->provider(new TracingAccountRepository($trace));
+        $user = new TestUser();
+        $user->setId(27);
+        $user->setEmail('outside@example.com');
+        $user->setPassword('unchanged-hash');
+        $exception = null;
+
+        try {
+            $provider->upgradePassword($user, 'must-not-be-saved');
+        } catch (\Throwable $caught) {
+            $exception = $caught;
+        }
+
+        self::assertSame('unchanged-hash', $user->getPassword());
+        self::assertSame([], $trace->operations());
+        self::assertInstanceOf(UnsupportedUserException::class, $exception);
+        self::assertStringNotContainsString('outside@example.com', $exception->getMessage());
     }
 
     private function provider(TracingAccountRepository $repository): AccountUserProvider
