@@ -8,6 +8,8 @@ use Te4g\UserBundle\Contract\AccountUserFactoryInterface;
 use Te4g\UserBundle\Factory\ConfiguredAccountUserFactory;
 use Te4g\UserBundle\Manager\EmailVerificationManager;
 use Te4g\UserBundle\Manager\MagicLinkManager;
+use Te4g\UserBundle\Manager\PasswordManager;
+use Te4g\UserBundle\Manager\PasswordResetManager;
 use Te4g\UserBundle\Manager\RegistrationManager;
 use Te4g\UserBundle\Security\AccountUserProvider;
 use Te4g\UserBundle\Security\VerifiedAccountUserChecker;
@@ -21,6 +23,10 @@ return static function (ContainerConfigurator $container): void {
         ->set(EmailVerificationManager::class)
             ->autowire()
         ->set(MagicLinkManager::class)
+            ->autowire()
+        ->set(PasswordManager::class)
+            ->autowire()
+        ->set(PasswordResetManager::class)
             ->autowire()
         ->set(RegistrationManager::class)
             ->autowire()
