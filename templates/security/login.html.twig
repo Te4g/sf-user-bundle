@@ -1,0 +1,31 @@
+{% trans_default_domain 'Te4gUserBundle' %}
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>{{ 'login.title'|trans }}</title></head>
+<body>
+<main>
+    <h1>{{ 'login.title'|trans }}</h1>
+    <div aria-live="polite">
+        {% if authentication_failed %}<p role="alert">{{ 'login.failed'|trans }}</p>{% endif %}
+    </div>
+    <form method="post" action="{{ path('te4g_user_login') }}">
+        <label for="login-email">{{ 'form.email'|trans }}</label>
+        <input id="login-email" name="_username" type="email" autocomplete="email" value="{{ last_username }}" required>
+        <label for="login-password">{{ 'form.password'|trans }}</label>
+        <input id="login-password" name="_password" type="password" autocomplete="current-password" required>
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
+        <button type="submit">{{ 'login.submit'|trans }}</button>
+    </form>
+
+    <h2>{{ 'login.magic_link_title'|trans }}</h2>
+    {{ form_start(magic_link_form) }}
+        {% if magic_link_form.vars.submitted and not magic_link_form.vars.valid %}
+            <div role="alert"><p>{{ 'form.error_summary'|trans }}</p>{{ form_errors(magic_link_form) }}</div>
+        {% endif %}
+        <div>{{ form_label(magic_link_form.email) }}{{ form_widget(magic_link_form.email) }}{{ form_errors(magic_link_form.email) }}</div>
+        {{ form_rest(magic_link_form) }}
+        <button type="submit">{{ 'login.magic_link_submit'|trans }}</button>
+    {{ form_end(magic_link_form, {render_rest: false}) }}
+</main>
+</body>
+</html>

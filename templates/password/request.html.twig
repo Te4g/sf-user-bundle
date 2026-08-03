@@ -1,0 +1,19 @@
+{% trans_default_domain 'Te4gUserBundle' %}
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>{{ 'password_request.title'|trans }}</title></head>
+<body>
+<main>
+    <h1>{{ 'password_request.title'|trans }}</h1>
+    <div aria-live="polite">{{ 'password_request.status'|trans }}</div>
+    {{ form_start(form) }}
+        {% if form.vars.submitted and not form.vars.valid %}
+            <div role="alert"><p>{{ 'form.error_summary'|trans }}</p>{{ form_errors(form) }}</div>
+        {% endif %}
+        <div>{{ form_label(form.email) }}{{ form_widget(form.email) }}{{ form_errors(form.email) }}</div>
+        {{ form_rest(form) }}
+        <button type="submit">{{ 'password_request.submit'|trans }}</button>
+    {{ form_end(form, {render_rest: false}) }}
+</main>
+</body>
+</html>

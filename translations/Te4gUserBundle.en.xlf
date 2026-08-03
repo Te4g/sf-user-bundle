@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xliff xmlns="urn:oasis:names:tc:xliff:document:1.2" version="1.2">
+  <file source-language="en" target-language="en" datatype="plaintext" original="file.ext">
+    <body>
+      <trans-unit id="form.email"><source>form.email</source><target>Email address</target></trans-unit>
+      <trans-unit id="form.password"><source>form.password</source><target>Password</target></trans-unit>
+      <trans-unit id="form.password_confirmation"><source>form.password_confirmation</source><target>Confirm password</target></trans-unit>
+      <trans-unit id="form.password_mismatch"><source>form.password_mismatch</source><target>The passwords do not match.</target></trans-unit>
+      <trans-unit id="form.error_summary"><source>form.error_summary</source><target>Please correct the errors below.</target></trans-unit>
+      <trans-unit id="registration.title"><source>registration.title</source><target>Create your account</target></trans-unit>
+      <trans-unit id="registration.status"><source>registration.status</source><target>Enter your details to register.</target></trans-unit>
+      <trans-unit id="registration.submit"><source>registration.submit</source><target>Register</target></trans-unit>
+      <trans-unit id="login.title"><source>login.title</source><target>Sign in</target></trans-unit>
+      <trans-unit id="login.failed"><source>login.failed</source><target>Unable to sign in with those credentials.</target></trans-unit>
+      <trans-unit id="login.submit"><source>login.submit</source><target>Sign in</target></trans-unit>
+      <trans-unit id="login.magic_link_title"><source>login.magic_link_title</source><target>Email me a sign-in link</target></trans-unit>
+      <trans-unit id="login.magic_link_submit"><source>login.magic_link_submit</source><target>Send sign-in link</target></trans-unit>
+      <trans-unit id="login_link.title"><source>login_link.title</source><target>Confirm sign in</target></trans-unit>
+      <trans-unit id="login_link.status"><source>login_link.status</source><target>Continue to sign in securely.</target></trans-unit>
+      <trans-unit id="login_link.submit"><source>login_link.submit</source><target>Continue</target></trans-unit>
+      <trans-unit id="check_email.title"><source>check_email.title</source><target>Check your email</target></trans-unit>
+      <trans-unit id="check_email.status"><source>check_email.status</source><target>If an eligible account exists, an email has been sent.</target></trans-unit>
+      <trans-unit id="check_email.resend"><source>check_email.resend</source><target>Resend verification email</target></trans-unit>
+      <trans-unit id="password_request.title"><source>password_request.title</source><target>Reset your password</target></trans-unit>
+      <trans-unit id="password_request.status"><source>password_request.status</source><target>Enter your email address to request a reset link.</target></trans-unit>
+      <trans-unit id="password_request.submit"><source>password_request.submit</source><target>Send reset link</target></trans-unit>
+      <trans-unit id="password_reset.title"><source>password_reset.title</source><target>Choose a new password</target></trans-unit>
+      <trans-unit id="password_reset.failed"><source>password_reset.failed</source><target>This reset link is invalid or has expired.</target></trans-unit>
+      <trans-unit id="password_reset.submit"><source>password_reset.submit</source><target>Save password</target></trans-unit>
+      <trans-unit id="email.verification.subject"><source>email.verification.subject</source><target>Verify your email address</target></trans-unit>
+      <trans-unit id="email.verification.heading"><source>email.verification.heading</source><target>Verify your email address</target></trans-unit>
+      <trans-unit id="email.verification.copy"><source>email.verification.copy</source><target>Use the link below to verify your account.</target></trans-unit>
+      <trans-unit id="email.verification.action"><source>email.verification.action</source><target>Verify email</target></trans-unit>
+      <trans-unit id="email.magic_link.subject"><source>email.magic_link.subject</source><target>Your sign-in link</target></trans-unit>
+      <trans-unit id="email.magic_link.heading"><source>email.magic_link.heading</source><target>Sign in to your account</target></trans-unit>
+      <trans-unit id="email.magic_link.copy"><source>email.magic_link.copy</source><target>Use the secure link below to sign in.</target></trans-unit>
+      <trans-unit id="email.magic_link.action"><source>email.magic_link.action</source><target>Sign in</target></trans-unit>
+      <trans-unit id="email.password_reset.subject"><source>email.password_reset.subject</source><target>Reset your password</target></trans-unit>
+      <trans-unit id="email.password_reset.heading"><source>email.password_reset.heading</source><target>Reset your password</target></trans-unit>
+      <trans-unit id="email.password_reset.copy"><source>email.password_reset.copy</source><target>Use the secure link below to choose a new password.</target></trans-unit>
+      <trans-unit id="email.password_reset.action"><source>email.password_reset.action</source><target>Reset password</target></trans-unit>
+      <trans-unit id="email.email_change.subject"><source>email.email_change.subject</source><target>Confirm your new email address</target></trans-unit>
+      <trans-unit id="email.email_change.heading"><source>email.email_change.heading</source><target>Confirm your new email address</target></trans-unit>
+      <trans-unit id="email.email_change.copy"><source>email.email_change.copy</source><target>Use the secure link below to confirm this email address.</target></trans-unit>
+      <trans-unit id="email.email_change.action"><source>email.email_change.action</source><target>Confirm email</target></trans-unit>
+    </body>
+  </file>
+</xliff>
