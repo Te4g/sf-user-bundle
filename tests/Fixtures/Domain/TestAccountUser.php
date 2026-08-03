@@ -12,6 +12,10 @@ class TestAccountUser implements AccountUserInterface
 
     private string $email = 'test@example.com';
 
+    private ?string $password = null;
+
+    private bool $verified = false;
+
     public function getId(): int|string|null
     {
         return $this->id;
@@ -43,11 +47,12 @@ class TestAccountUser implements AccountUserInterface
 
     public function getPassword(): ?string
     {
-        return null;
+        return $this->password;
     }
 
     public function setPassword(string $password): void
     {
+        $this->password = $password;
     }
 
     public function getUserIdentifier(): string
@@ -72,10 +77,11 @@ class TestAccountUser implements AccountUserInterface
 
     public function isVerified(): bool
     {
-        return false;
+        return $this->verified;
     }
 
     public function setVerified(bool $verified): void
     {
+        $this->verified = $verified;
     }
 }
