@@ -39,7 +39,10 @@ final class SkeletonRendererTest extends TestCase
             'src/Entity/User.php',
             'src/Repository/ResetPasswordRequestRepository.php',
             'src/Repository/UserRepository.php',
-        ], array_keys($files));
+        ], array_slice(array_keys($files), 0, 10));
+        self::assertArrayHasKey('templates/components/Card.html.twig', $files);
+        self::assertArrayHasKey('templates/bundles/Te4gUserBundle/security/login.html.twig', $files);
+        self::assertArrayHasKey('assets/controllers/password_visibility_controller.js', $files);
         self::assertStringContainsString('final class User implements AccountUserInterface', $files['src/Entity/User.php']);
         self::assertStringContainsString('enabled: true', $files['config/packages/te4g_user.yaml']);
         self::assertStringContainsString('check_post_only: true', $files['config/packages/te4g_user_security.yaml']);
