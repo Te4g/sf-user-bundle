@@ -2,15 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Acme\Bundle\TemplateBundle\Tests\Integration;
+namespace Te4g\UserBundle\Tests\Integration;
 
-use Acme\Bundle\TemplateBundle\Service\ExampleService;
-use Acme\Bundle\TemplateBundle\Tests\Fixtures\App\TestKernel;
 use PHPUnit\Framework\TestCase;
+use Te4g\UserBundle\Tests\Fixtures\App\TestKernel;
 
 final class BundleKernelTest extends TestCase
 {
-    public function testConfiguredMessageIsInjectedIntoExampleService(): void
+    public function testBundleBootsWithConfiguration(): void
     {
         $kernel = new TestKernel([
             'message' => 'Configured from test kernel',
@@ -19,10 +18,8 @@ final class BundleKernelTest extends TestCase
         $kernel->boot();
 
         try {
-            $service = $kernel->getContainer()->get('test.'.ExampleService::class);
-
-            self::assertInstanceOf(ExampleService::class, $service);
-            self::assertSame('Configured from test kernel', $service->message());
+            self::assertTrue($kernel->getContainer()->hasParameter('template.message'));
+            self::assertSame('Configured from test kernel', $kernel->getContainer()->getParameter('template.message'));
         } finally {
             $kernel->shutdown();
         }

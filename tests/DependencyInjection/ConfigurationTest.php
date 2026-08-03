@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Acme\Bundle\TemplateBundle\Tests\DependencyInjection;
+namespace Te4g\UserBundle\Tests\DependencyInjection;
 
-use Acme\Bundle\TemplateBundle\DependencyInjection\Configuration;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Config\Definition\Processor;
+use Te4g\UserBundle\DependencyInjection\Configuration;
 
 final class ConfigurationTest extends TestCase
 {
