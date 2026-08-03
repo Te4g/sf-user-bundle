@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Acme\Bundle\TemplateBundle\DependencyInjection;
+namespace Te4g\UserBundle\DependencyInjection;
 
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\Extension;
 use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
 
-final class TemplateExtension extends Extension
+final class Te4gUserExtension extends Extension
 {
     /**
      * @param array<int, array<string, mixed>> $configs
@@ -26,6 +26,6 @@ final class TemplateExtension extends Extension
 
     public function getAlias(): string
     {
-        return 'template';
+        return 'te4g_user';
     }
 }

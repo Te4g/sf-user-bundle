@@ -2,13 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Acme\Bundle\TemplateBundle\Tests\Fixtures\App;
+namespace Te4g\UserBundle\Tests\Fixtures\App;
 
-use Acme\Bundle\TemplateBundle\Service\ExampleService;
-use Acme\Bundle\TemplateBundle\TemplateBundle;
 use Symfony\Component\Config\Loader\LoaderInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\HttpKernel\Kernel;
+use Te4g\UserBundle\Te4gUserBundle;
 
 final class TestKernel extends Kernel
 {
@@ -38,7 +37,7 @@ final class TestKernel extends Kernel
     public function registerBundles(): iterable
     {
         return [
-            new TemplateBundle(),
+            new Te4gUserBundle(),
         ];
     }
 
@@ -47,8 +46,7 @@ final class TestKernel extends Kernel
         $templateConfig = $this->templateConfig;
 
         $loader->load(static function (ContainerBuilder $container) use ($templateConfig): void {
-            $container->loadFromExtension('template', $templateConfig);
-            $container->setAlias('test.'.ExampleService::class, ExampleService::class)->setPublic(true);
+            $container->loadFromExtension('te4g_user', $templateConfig);
         });
     }
 }

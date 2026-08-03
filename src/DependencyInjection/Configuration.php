@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Acme\Bundle\TemplateBundle\DependencyInjection;
+namespace Te4g\UserBundle\DependencyInjection;
 
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;

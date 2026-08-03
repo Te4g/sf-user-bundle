@@ -18,11 +18,3 @@ stan: ## Run PHPStan
 
 phpunit: ## Run PHPUnit
 	@php vendor/bin/phpunit --configuration phpunit.xml.dist
-
-## —— Template ————————————————————————————————————————————————————————————
-rename: ## Rename the bundle
-	@read -r -p "Enter the new bundle namespace (e.g., Te4g\\Bundle\\InvoiceBundle): " NAMESPACE_INPUT; \
-	if [ -z $$NAMESPACE_INPUT ]; then \
-	  echo "No namespace provided. Aborting."; exit 1; \
-	fi; \
-	php ./scripts/rename.php "$$NAMESPACE_INPUT"
