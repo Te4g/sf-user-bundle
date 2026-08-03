@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Te4g\UserBundle\Installer;
 
+use Te4g\UserBundle\Exception\InstallerConflict;
+
 final readonly class SkeletonRenderer
 {
     private const array TEMPLATES = [
@@ -68,40 +70,71 @@ final readonly class SkeletonRenderer
 
         $json = file_get_contents($composerPath);
         if (false === $json) {
-            throw new \RuntimeException('Invalid application namespace configuration.');
+            throw InstallerConflict::invalidProjectConfiguration();
         }
 
         try {
             $composer = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException) {
-            throw new \RuntimeException('Invalid application namespace configuration.');
+            throw InstallerConflict::invalidProjectConfiguration();
         }
 
         $psr4 = is_array($composer) && isset($composer['autoload']) && is_array($composer['autoload'])
             ? ($composer['autoload']['psr-4'] ?? null)
             : null;
         if (!is_array($psr4)) {
-            return 'App';
+            throw InstallerConflict::invalidProjectConfiguration();
         }
 
+        $sourceNamespaces = [];
         foreach ($psr4 as $namespace => $directory) {
             $directories = is_array($directory) ? $directory : [$directory];
             foreach ($directories as $candidate) {
-                if (is_string($candidate) && 'src' === trim(str_replace('\\', '/', $candidate), '/')) {
-                    if (!is_string($namespace)) {
-                        break 2;
-                    }
-
-                    $namespace = rtrim($namespace, '\\');
-                    if (1 !== preg_match('/^[A-Za-z_][A-Za-z0-9_]*(?:\\\\[A-Za-z_][A-Za-z0-9_]*)*$/D', $namespace)) {
-                        throw new \RuntimeException('Invalid application namespace configuration.');
-                    }
-
-                    return $namespace;
+                if (!$this->mapsProjectSource($candidate)) {
+                    continue;
                 }
+
+                if (!is_string($namespace) || !str_ends_with($namespace, '\\')) {
+                    throw InstallerConflict::invalidProjectConfiguration();
+                }
+
+                $applicationNamespace = substr($namespace, 0, -1);
+                if (1 !== preg_match('/^[A-Za-z_][A-Za-z0-9_]*(?:\\\\[A-Za-z_][A-Za-z0-9_]*)*$/D', $applicationNamespace)) {
+                    throw InstallerConflict::invalidProjectConfiguration();
+                }
+
+                $sourceNamespaces[$applicationNamespace] = true;
+
+                break;
             }
         }
 
-        return 'App';
+        if (1 !== count($sourceNamespaces)) {
+            throw InstallerConflict::invalidProjectConfiguration();
+        }
+
+        return array_key_first($sourceNamespaces);
+    }
+
+    private function mapsProjectSource(mixed $directory): bool
+    {
+        if (!is_string($directory) || '' === $directory || str_contains($directory, "\0")) {
+            return false;
+        }
+
+        $portablePath = str_replace('\\', '/', $directory);
+        if (str_starts_with($portablePath, '/') || 1 === preg_match('/^[A-Za-z]:\//', $portablePath)) {
+            return false;
+        }
+
+        $segments = array_values(array_filter(
+            explode('/', $portablePath),
+            static fn (string $segment): bool => '' !== $segment,
+        ));
+        if ('.' === ($segments[0] ?? null)) {
+            array_shift($segments);
+        }
+
+        return ['src'] === $segments;
     }
 }
