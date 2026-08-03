@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Te4g\UserBundle\Installer\InstallationPlanner;
+use Te4g\UserBundle\Installer\InstallationRaceHookInterface;
 use Te4g\UserBundle\Installer\InstallationValidator;
 use Te4g\UserBundle\Installer\InstallationValidatorInterface;
 use Te4g\UserBundle\Installer\ManifestStore;
 use Te4g\UserBundle\Installer\MarkerEditor;
+use Te4g\UserBundle\Installer\NullInstallationRaceHook;
 use Te4g\UserBundle\Installer\StagedWriter;
 
 return static function (ContainerConfigurator $container): void {
@@ -17,6 +19,8 @@ return static function (ContainerConfigurator $container): void {
     $services->set(ManifestStore::class);
     $services->set(MarkerEditor::class);
     $services->set(InstallationPlanner::class);
+    $services->set(NullInstallationRaceHook::class);
+    $services->alias(InstallationRaceHookInterface::class, NullInstallationRaceHook::class);
     $services->set(InstallationValidator::class);
     $services->alias(InstallationValidatorInterface::class, InstallationValidator::class);
     $services->set(StagedWriter::class);

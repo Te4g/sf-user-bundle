@@ -5,12 +5,21 @@ declare(strict_types=1);
 namespace Te4g\UserBundle\Installer;
 
 use Te4g\UserBundle\Exception\InstallerConflict;
+use Te4g\UserBundle\Exception\InstallerRollbackIncomplete;
 use Te4g\UserBundle\Exception\InstallerWriteFailed;
 
 final readonly class StagedWriter
 {
-    public function __construct(private InstallationValidatorInterface $validator)
-    {
+    private InstallerFilesystem $filesystem;
+    private InstallationRaceHookInterface $raceHook;
+
+    public function __construct(
+        private InstallationValidatorInterface $validator,
+        ?InstallationRaceHookInterface $raceHook = null,
+        ?InstallerFilesystem $filesystem = null,
+    ) {
+        $this->raceHook = $raceHook ?? new NullInstallationRaceHook();
+        $this->filesystem = $filesystem ?? new InstallerFilesystem();
     }
 
     public function apply(InstallationPlan $plan): InstallationResult
@@ -24,154 +33,220 @@ final readonly class StagedWriter
             return new InstallationResult($layout, [], []);
         }
 
-        $this->assertTargetsUnchanged($layout, $plan->files());
-
+        $lock = ProjectLock::acquire($layout, $this->filesystem);
         $stagingRelative = 'var/te4g-user-installer/'.bin2hex(random_bytes(16));
-        $stagingPath = $layout->path($stagingRelative);
-        $createdStagingDirectories = [];
+        $stagingCreated = false;
         $snapshots = [];
         $createdTargetDirectories = [];
-        $result = null;
 
         try {
-            $this->createDirectory($layout, $stagingRelative, 0700, $createdStagingDirectories);
-            $stagedFiles = $this->stage($layout, $stagingRelative, $plan->files(), $createdStagingDirectories);
+            $this->assertTargetsUnchanged($layout, $plan->files());
+            $stagingDirectories = [];
+            $this->createDirectory($layout, $stagingRelative, 0700, $stagingDirectories);
+            $stagingCreated = true;
+            $stagedFiles = $this->stage($layout, $stagingRelative, $plan->files(), $stagingDirectories);
 
             foreach ($stagedFiles as $relativePath => $stagedPath) {
                 $this->validator->validate($stagedPath, $relativePath);
             }
 
             foreach ($plan->files() as $file) {
-                $this->assertTargetUnchanged($layout, $file);
-                $target = $layout->path($file->relativePath());
-                $originalContents = null;
-                $originalMode = null;
-                if (file_exists($target)) {
-                    $originalContents = file_get_contents($target);
-                    if (false === $originalContents) {
-                        throw InstallerWriteFailed::writeFailed();
-                    }
-
-                    $permissions = fileperms($target);
-                    if (false === $permissions) {
-                        throw InstallerWriteFailed::writeFailed();
-                    }
-
-                    $originalMode = $permissions & 0777;
-                }
-
-                $parentRelative = dirname(str_replace('\\', '/', $file->relativePath()));
-                if ('.' !== $parentRelative) {
+                $parentRelative = dirname($file->relativePath());
+                $parentRelative = '.' === $parentRelative ? null : $parentRelative;
+                if (null !== $parentRelative) {
                     $this->createDirectory($layout, $parentRelative, 0755, $createdTargetDirectories);
                 }
 
-                $this->assertTargetUnchanged($layout, $file);
-                $target = $layout->path($file->relativePath());
+                $parentPath = null === $parentRelative ? $layout->projectDir() : $layout->path($parentRelative);
+                $parentIdentity = $this->requiredDirectoryIdentity($parentPath);
+                [$originalContents, $originalMode, $originalIdentity] = $this->captureTargetState($layout, $file);
+
+                $this->raceHook->beforeTargetWrite($layout, $file);
+                $this->assertParentUnchanged($layout, $parentRelative, $parentIdentity, $file->relativePath());
+                $this->assertTargetStateUnchanged($layout, $file, $originalIdentity);
+
                 $stagedPath = $stagedFiles[$file->relativePath()];
-                $snapshots[] = [
-                    'path' => $file->relativePath(),
-                    'contents' => $originalContents,
-                    'mode' => $originalMode,
-                ];
-                if (!rename($stagedPath, $target)) {
-                    throw InstallerWriteFailed::writeFailed();
+                if ($file->isCreate()) {
+                    if ($this->raceHook instanceof InstallationCreateRaceHookInterface) {
+                        $this->raceHook->beforeCreateLink($layout, $file);
+                    }
+
+                    $this->assertParentUnchanged($layout, $parentRelative, $parentIdentity, $file->relativePath());
+                    $target = $layout->path($file->relativePath());
+
+                    try {
+                        $this->filesystem->hardLink($stagedPath, $target);
+                    } catch (InstallerWriteFailed) {
+                        if (null !== $this->filesystem->identity($target)) {
+                            throw InstallerConflict::forPath($file->relativePath(), 'create-target-changed');
+                        }
+
+                        throw InstallerWriteFailed::writeFailed();
+                    }
+                } else {
+                    $target = $layout->path($file->relativePath());
+                    $this->filesystem->rename($stagedPath, $target);
                 }
 
-                $targetMode = $originalMode ?? 0644;
-                if (!chmod($target, $targetMode)) {
-                    throw InstallerWriteFailed::writeFailed();
-                }
+                $writtenIdentity = $this->filesystem->identity($target);
+                $snapshot = new InstalledFileSnapshot(
+                    $file->relativePath(),
+                    $originalContents,
+                    $originalMode,
+                    $parentRelative,
+                    $parentIdentity,
+                    hash('sha256', $file->contents()),
+                    $writtenIdentity,
+                );
+                $snapshots[] = $snapshot;
 
+                $this->filesystem->chmod($target, $originalMode ?? 0644);
+                $this->assertInstallerWriteStable($layout, $snapshot);
+                if ($file->isCreate()) {
+                    $this->filesystem->remove($stagedPath);
+                }
             }
 
-            $result = new InstallationResult($layout, $snapshots, $createdTargetDirectories);
+            $result = new InstallationResult(
+                $layout,
+                $snapshots,
+                $createdTargetDirectories,
+                $lock,
+                $this->filesystem,
+                $this->raceHook,
+            );
             foreach ($plan->files() as $file) {
                 $this->validator->validate($layout->path($file->relativePath()), $file->relativePath());
             }
 
+            $this->removeStagingDirectory($layout, $stagingRelative);
+            $stagingCreated = false;
+
             return $result;
-        } catch (InstallerConflict $exception) {
-            $result ??= $this->partialResult($layout, $snapshots, $createdTargetDirectories);
-            if (null !== $result) {
-                $result->rollback();
+        } catch (\Throwable $primaryFailure) {
+            $primaryOutcome = $this->primaryOutcome($primaryFailure);
+            $rollbackOutcome = null;
+            $partialResult = new InstallationResult(
+                $layout,
+                $snapshots,
+                $createdTargetDirectories,
+                $lock,
+                $this->filesystem,
+                $this->raceHook,
+            );
+
+            try {
+                $partialResult->rollback();
+            } catch (InstallerRollbackIncomplete $rollbackFailure) {
+                $rollbackOutcome = $rollbackFailure->rollbackOutcome();
             }
 
-            throw $exception;
-        } catch (InstallerWriteFailed $exception) {
-            $result ??= $this->partialResult($layout, $snapshots, $createdTargetDirectories);
-            if (null !== $result) {
+            if ($stagingCreated) {
                 try {
-                    $result->rollback();
-                } catch (InstallerWriteFailed) {
-                }
-
-                throw InstallerWriteFailed::writeFailed($exception);
-            }
-
-            throw $exception;
-        } catch (\Throwable $exception) {
-            $result ??= $this->partialResult($layout, $snapshots, $createdTargetDirectories);
-            if (null !== $result) {
-                try {
-                    $result->rollback();
-                } catch (InstallerWriteFailed) {
+                    $this->removeStagingDirectory($layout, $stagingRelative);
+                } catch (\Throwable) {
+                    $rollbackOutcome = 'operation-failed';
                 }
             }
 
-            throw InstallerWriteFailed::writeFailed($exception);
-        } finally {
-            $this->removeStagingDirectory($stagingPath);
-        }
-    }
+            if (null !== $rollbackOutcome) {
+                throw InstallerRollbackIncomplete::after($primaryOutcome, $rollbackOutcome);
+            }
 
-    /**
-     * @param list<array{path: string, contents: string|null, mode: int|null}> $snapshots
-     * @param list<string>                                                     $createdDirectories
-     */
-    private function partialResult(
-        ProjectLayout $layout,
-        array $snapshots,
-        array $createdDirectories,
-    ): ?InstallationResult {
-        if ([] === $snapshots && [] === $createdDirectories) {
-            return null;
+            throw $this->safePrimaryFailure($primaryFailure);
         }
-
-        return new InstallationResult($layout, $snapshots, $createdDirectories);
     }
 
     /** @param list<PlannedFile> $files */
     private function assertTargetsUnchanged(ProjectLayout $layout, array $files): void
     {
         foreach ($files as $file) {
-            $this->assertTargetUnchanged($layout, $file);
+            $this->captureTargetState($layout, $file);
         }
     }
 
-    private function assertTargetUnchanged(ProjectLayout $layout, PlannedFile $file): void
+    /**
+     * @return array{string|null, int|null, FilesystemIdentity|null}
+     */
+    private function captureTargetState(ProjectLayout $layout, PlannedFile $file): array
     {
         $target = $layout->path($file->relativePath());
+        $identity = $this->filesystem->identity($target);
         if ($file->isCreate()) {
-            if (file_exists($target) || is_link($target)) {
+            if (null !== $identity) {
                 throw InstallerConflict::forPath($file->relativePath(), 'create-target-exists');
+            }
+
+            return [null, null, null];
+        }
+
+        if (null === $identity || !$identity->isRegularFile() || is_link($target)) {
+            throw InstallerConflict::forPath($file->relativePath(), 'managed-target-missing');
+        }
+
+        $contents = $this->filesystem->read($target);
+        if (!hash_equals((string) $file->priorHash(), hash('sha256', $contents))) {
+            throw InstallerConflict::forPath($file->relativePath(), 'managed-target-changed');
+        }
+
+        return [$contents, $this->filesystem->mode($target), $identity];
+    }
+
+    private function assertTargetStateUnchanged(
+        ProjectLayout $layout,
+        PlannedFile $file,
+        ?FilesystemIdentity $originalIdentity,
+    ): void {
+        $target = $layout->path($file->relativePath());
+        $currentIdentity = $this->filesystem->identity($target);
+        if ($file->isCreate()) {
+            if (null !== $currentIdentity) {
+                throw InstallerConflict::forPath($file->relativePath(), 'create-target-changed');
             }
 
             return;
         }
 
-        if (!is_file($target) || is_link($target)) {
-            throw InstallerConflict::forPath($file->relativePath(), 'managed-target-missing');
-        }
-
-        $contents = file_get_contents($target);
-        if (false === $contents || !hash_equals((string) $file->priorHash(), hash('sha256', $contents))) {
+        if (null === $originalIdentity
+            || !$originalIdentity->equals($currentIdentity)
+            || !hash_equals((string) $file->priorHash(), $this->filesystem->hash($target))
+        ) {
             throw InstallerConflict::forPath($file->relativePath(), 'managed-target-changed');
         }
     }
 
+    private function assertParentUnchanged(
+        ProjectLayout $layout,
+        ?string $parentRelative,
+        FilesystemIdentity $expectedIdentity,
+        string $targetRelative,
+    ): void {
+        $parent = null === $parentRelative ? $layout->projectDir() : $layout->path($parentRelative);
+        if (!$expectedIdentity->equals($this->filesystem->identity($parent))) {
+            throw InstallerConflict::forPath($targetRelative, 'target-parent-changed');
+        }
+    }
+
+    private function assertInstallerWriteStable(ProjectLayout $layout, InstalledFileSnapshot $snapshot): void
+    {
+        $parentRelative = $snapshot->parentRelativePath();
+        $parent = null === $parentRelative
+            ? $layout->projectDir()
+            : $layout->path($parentRelative);
+        $writtenIdentity = $snapshot->writtenIdentity();
+        $target = $layout->path($snapshot->relativePath());
+        if (!$snapshot->parentIdentity()->equals($this->filesystem->identity($parent))
+            || null === $writtenIdentity
+            || !$writtenIdentity->equals($this->filesystem->identity($target))
+            || !hash_equals($snapshot->writtenHash(), $this->filesystem->hash($target))
+        ) {
+            throw InstallerWriteFailed::writeFailed();
+        }
+    }
+
     /**
-     * @param list<PlannedFile> $files
-     * @param list<string>      $createdDirectories
+     * @param list<PlannedFile>                                       $files
+     * @param list<array{path: string, identity: FilesystemIdentity}> $createdDirectories
      *
      * @return array<string, string>
      */
@@ -185,20 +260,16 @@ final readonly class StagedWriter
         foreach ($files as $file) {
             $relativePath = $layout->normalizeRelativePath($file->relativePath());
             $stagedRelative = $stagingRelative.'/'.$relativePath;
-            $parent = dirname($stagedRelative);
-            $this->createDirectory($layout, $parent, 0700, $createdDirectories);
+            $this->createDirectory($layout, dirname($stagedRelative), 0700, $createdDirectories);
             $path = $layout->path($stagedRelative);
-            if (false === file_put_contents($path, $file->contents(), LOCK_EX) || !chmod($path, 0600)) {
-                throw InstallerWriteFailed::writeFailed();
-            }
-
+            $this->filesystem->writeExclusive($path, $file->contents(), 0600);
             $staged[$relativePath] = $path;
         }
 
         return $staged;
     }
 
-    /** @param list<string> $createdDirectories */
+    /** @param list<array{path: string, identity: FilesystemIdentity}> $createdDirectories */
     private function createDirectory(ProjectLayout $layout, string $relativePath, int $mode, array &$createdDirectories): void
     {
         $relativePath = $layout->normalizeRelativePath($relativePath);
@@ -206,38 +277,91 @@ final readonly class StagedWriter
         foreach (explode('/', $relativePath) as $segment) {
             $current = '' === $current ? $segment : $current.'/'.$segment;
             $path = $layout->path($current);
-            if (is_dir($path)) {
+            $identity = $this->filesystem->identity($path);
+            if (null !== $identity) {
+                if (!$identity->isDirectory()) {
+                    throw InstallerWriteFailed::writeFailed();
+                }
+
                 continue;
             }
 
-            if (file_exists($path) || is_link($path) || !mkdir($path, $mode)) {
+            try {
+                $this->filesystem->createDirectory($path, $mode);
+            } catch (InstallerWriteFailed) {
+                $identity = $this->filesystem->identity($layout->path($current));
+                if (null !== $identity && $identity->isDirectory()) {
+                    continue;
+                }
+
                 throw InstallerWriteFailed::writeFailed();
             }
 
-            $createdDirectories[] = $current;
+            $identity = $this->requiredDirectoryIdentity($layout->path($current));
+            $createdDirectories[] = ['path' => $current, 'identity' => $identity];
         }
     }
 
-    private function removeStagingDirectory(string $path): void
+    private function requiredDirectoryIdentity(string $path): FilesystemIdentity
     {
-        if (!file_exists($path) && !is_link($path)) {
+        $identity = $this->filesystem->identity($path);
+        if (null === $identity || !$identity->isDirectory()) {
+            throw InstallerWriteFailed::writeFailed();
+        }
+
+        return $identity;
+    }
+
+    private function removeStagingDirectory(ProjectLayout $layout, string $relativePath): void
+    {
+        $path = $layout->path($relativePath);
+        $identity = $this->filesystem->identity($path);
+        if (null === $identity) {
             return;
         }
 
-        if (!is_dir($path) || is_link($path)) {
-            @unlink($path);
-
-            return;
+        if (!$identity->isDirectory()) {
+            throw InstallerWriteFailed::writeFailed();
         }
 
-        foreach (scandir($path) ?: [] as $entry) {
-            if ('.' === $entry || '..' === $entry) {
-                continue;
+        foreach ($this->filesystem->entries($path) as $entry) {
+            $childRelative = $relativePath.'/'.$entry;
+            $child = $layout->path($childRelative);
+            $childIdentity = $this->filesystem->identity($child);
+            if (null !== $childIdentity && $childIdentity->isDirectory()) {
+                $this->removeStagingDirectory($layout, $childRelative);
+            } elseif (null !== $childIdentity) {
+                $this->filesystem->remove($child);
             }
-
-            $this->removeStagingDirectory($path.DIRECTORY_SEPARATOR.$entry);
         }
 
-        @rmdir($path);
+        $finalPath = $layout->path($relativePath);
+        if (!$identity->equals($this->filesystem->identity($finalPath))) {
+            throw InstallerWriteFailed::writeFailed();
+        }
+
+        $this->filesystem->removeDirectory($finalPath);
+    }
+
+    private function primaryOutcome(\Throwable $failure): string
+    {
+        if ($failure instanceof InstallerWriteFailed) {
+            return $failure->outcome();
+        }
+
+        return $failure instanceof InstallerConflict ? 'conflict' : 'write-failed';
+    }
+
+    private function safePrimaryFailure(\Throwable $failure): InstallerConflict|InstallerWriteFailed
+    {
+        if ($failure instanceof InstallerConflict) {
+            return $failure;
+        }
+
+        if ($failure instanceof InstallerWriteFailed && 'validation-failed' === $failure->outcome()) {
+            return InstallerWriteFailed::validationFailed();
+        }
+
+        return InstallerWriteFailed::writeFailed();
     }
 }

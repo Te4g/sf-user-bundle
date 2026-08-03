@@ -18,6 +18,10 @@ final readonly class InstallationValidator implements InstallationValidatorInter
 
     public function validate(string $absolutePath, string $relativePath): void
     {
+        set_error_handler(static function (): never {
+            throw new \ErrorException('Installer validation operation failed.');
+        });
+
         try {
             if (str_ends_with($relativePath, '.php')) {
                 $this->validatePhp($absolutePath);
@@ -28,10 +32,10 @@ final readonly class InstallationValidator implements InstallationValidatorInter
             } elseif (str_ends_with($relativePath, '.twig')) {
                 $this->validateTwig($absolutePath, $relativePath);
             }
-        } catch (InstallerWriteFailed $exception) {
-            throw $exception;
-        } catch (\Throwable $exception) {
-            throw InstallerWriteFailed::validationFailed($exception);
+        } catch (\Throwable) {
+            throw InstallerWriteFailed::validationFailed();
+        } finally {
+            restore_error_handler();
         }
     }
 

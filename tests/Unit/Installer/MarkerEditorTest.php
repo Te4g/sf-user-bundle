@@ -90,6 +90,14 @@ final class MarkerEditorTest extends TestCase
         (new MarkerEditor())->upsert('', 'shadcn', '/* <te4g-user name="nested"> */');
     }
 
+    public function testGeneratedPayloadCannotContainClosingMarkerPrefixVariant(): void
+    {
+        $this->expectException(InstallerConflict::class);
+        $this->expectExceptionMessage('Invalid installer marker region.');
+
+        (new MarkerEditor())->upsert('', 'shadcn', '/* </te4g-user altered> */');
+    }
+
     public function testUnsafeMarkerNameIsRejected(): void
     {
         $this->expectException(InstallerConflict::class);
