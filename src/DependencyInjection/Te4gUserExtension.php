@@ -18,10 +18,16 @@ final class Te4gUserExtension extends Extension
     {
         $config = $this->processConfiguration(new Configuration(), $configs);
 
-        $container->setParameter('template.message', $config['message']);
+        $container->setParameter('te4g_user.config', $config);
+        $container->setParameter('te4g_user.redirects.login_success', $config['redirects']['login_success']);
 
         $loader = new PhpFileLoader($container, new FileLocator(__DIR__.'/../../config'));
         $loader->load('services.php');
+        $loader->load('installer.php');
+
+        if (true === $config['enabled']) {
+            $loader->load('runtime.php');
+        }
     }
 
     public function getAlias(): string
