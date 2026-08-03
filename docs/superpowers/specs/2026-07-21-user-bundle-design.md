@@ -304,14 +304,17 @@ Stable route names use the `te4g_user_` prefix. Default paths are:
 - `GET|POST /register` for registration;
 - `GET /verify-email` for verification;
 - `POST /verify-email/resend` for verification resend;
-- `GET|POST /login` for password login and the magic-link request form;
+- `GET|POST /login` for password login and the page containing the magic-link
+  request form;
+- `POST /login-link` for neutral magic-link requests;
 - `POST /logout` for logout;
-- `GET /login-link/confirm` for the human confirmation landing page;
-- `POST /login-link/check` for the native login-link authenticator;
+- `GET|POST /login-link/check` for the human GET confirmation followed by the
+  native POST login-link authenticator;
 - `GET|POST /forgot-password` for reset requests;
 - `GET|POST /reset-password/{token}` for password replacement;
 - `GET /account` for the account overview;
 - `GET|POST /account/profile` for profile and pending-email management;
+- `GET /account/email-change` for signed pending-email confirmation;
 - `GET|POST /account/password` for password changes;
 - `POST /account/delete` for destructive deletion.
 
@@ -539,4 +542,3 @@ environments with Symfony 8.1.
   <https://ux.symfony.com/toolkit/kits/shadcn>
 - SymfonyCasts TailwindBundle:
   <https://symfony.com/bundles/TailwindBundle/current/index.html>
-
