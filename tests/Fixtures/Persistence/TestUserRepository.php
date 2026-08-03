@@ -12,6 +12,7 @@ use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Security\Core\User\UserProviderInterface;
 use Te4g\UserBundle\Contract\AccountRepositoryInterface;
 use Te4g\UserBundle\Contract\AccountUserInterface;
+use Te4g\UserBundle\Exception\AccountDeletionRejected;
 use Te4g\UserBundle\Util\EmailNormalizer;
 
 /**
@@ -21,6 +22,8 @@ use Te4g\UserBundle\Util\EmailNormalizer;
  */
 final class TestUserRepository extends ServiceEntityRepository implements AccountRepositoryInterface, UserProviderInterface
 {
+    private bool $removeShouldFail = false;
+
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, TestUser::class);
@@ -44,8 +47,19 @@ final class TestUserRepository extends ServiceEntityRepository implements Accoun
 
     public function remove(AccountUserInterface $user): void
     {
+        if ($this->removeShouldFail) {
+            $this->removeShouldFail = false;
+
+            throw new AccountDeletionRejected('test_repository_rejected_deletion');
+        }
+
         $this->entityManager()->remove($this->testUser($user));
         $this->entityManager()->flush();
+    }
+
+    public function failNextRemove(): void
+    {
+        $this->removeShouldFail = true;
     }
 
     public function loadUserByIdentifier(string $identifier): UserInterface

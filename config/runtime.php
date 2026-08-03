@@ -10,14 +10,21 @@ use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_it
 use Te4g\UserBundle\Contract\AccountMailerInterface;
 use Te4g\UserBundle\Contract\AccountRepositoryInterface;
 use Te4g\UserBundle\Contract\AccountUserFactoryInterface;
+use Te4g\UserBundle\Controller\AccountController;
 use Te4g\UserBundle\Controller\AccountRequestLimiter;
+use Te4g\UserBundle\Controller\DeleteAccountController;
 use Te4g\UserBundle\Controller\LoginController;
 use Te4g\UserBundle\Controller\MagicLinkController;
+use Te4g\UserBundle\Controller\PasswordController;
 use Te4g\UserBundle\Controller\PasswordResetController;
+use Te4g\UserBundle\Controller\ProfileController;
 use Te4g\UserBundle\Controller\RegistrationController;
 use Te4g\UserBundle\Controller\VerificationController;
 use Te4g\UserBundle\Factory\ConfiguredAccountUserFactory;
+use Te4g\UserBundle\Form\DeleteAccountType;
 use Te4g\UserBundle\Form\EmailType;
+use Te4g\UserBundle\Form\PasswordChangeType;
+use Te4g\UserBundle\Form\ProfileType;
 use Te4g\UserBundle\Form\RegistrationType;
 use Te4g\UserBundle\Form\ResetPasswordType;
 use Te4g\UserBundle\Mailer\AccountMailer;
@@ -45,6 +52,15 @@ return static function (ContainerConfigurator $container): void {
         ->set(EmailType::class)
             ->autowire()
             ->tag('form.type')
+        ->set(DeleteAccountType::class)
+            ->autowire()
+            ->tag('form.type')
+        ->set(PasswordChangeType::class)
+            ->autowire()
+            ->tag('form.type')
+        ->set(ProfileType::class)
+            ->autowire()
+            ->tag('form.type')
         ->set(RegistrationType::class)
             ->autowire()
             ->tag('form.type')
@@ -55,11 +71,27 @@ return static function (ContainerConfigurator $container): void {
             ->autowire()
             ->autoconfigure()
             ->tag('controller.service_arguments')
+        ->set(AccountController::class)
+            ->autowire()
+            ->autoconfigure()
+            ->tag('controller.service_arguments')
+        ->set(DeleteAccountController::class)
+            ->autowire()
+            ->autoconfigure()
+            ->tag('controller.service_arguments')
         ->set(MagicLinkController::class)
             ->autowire()
             ->autoconfigure()
             ->tag('controller.service_arguments')
         ->set(PasswordResetController::class)
+            ->autowire()
+            ->autoconfigure()
+            ->tag('controller.service_arguments')
+        ->set(PasswordController::class)
+            ->autowire()
+            ->autoconfigure()
+            ->tag('controller.service_arguments')
+        ->set(ProfileController::class)
             ->autowire()
             ->autoconfigure()
             ->tag('controller.service_arguments')

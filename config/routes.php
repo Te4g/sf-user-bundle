@@ -3,9 +3,13 @@
 declare(strict_types=1);
 
 use Symfony\Component\Routing\Loader\Configurator\RoutingConfigurator;
+use Te4g\UserBundle\Controller\AccountController;
+use Te4g\UserBundle\Controller\DeleteAccountController;
 use Te4g\UserBundle\Controller\LoginController;
 use Te4g\UserBundle\Controller\MagicLinkController;
+use Te4g\UserBundle\Controller\PasswordController;
 use Te4g\UserBundle\Controller\PasswordResetController;
+use Te4g\UserBundle\Controller\ProfileController;
 use Te4g\UserBundle\Controller\RegistrationController;
 use Te4g\UserBundle\Controller\VerificationController;
 
@@ -49,4 +53,24 @@ return static function (RoutingConfigurator $routes): void {
     $routes->add('te4g_user_check_email', '/check-email')
         ->controller([LoginController::class, 'checkEmail'])
         ->methods(['GET']);
+
+    $routes->add('te4g_user_account', '/account')
+        ->controller([AccountController::class, 'index'])
+        ->methods(['GET']);
+
+    $routes->add('te4g_user_profile', '/account/profile')
+        ->controller([ProfileController::class, 'profile'])
+        ->methods(['GET', 'POST']);
+
+    $routes->add('te4g_user_email_change_confirm', '/account/email-change')
+        ->controller([ProfileController::class, 'confirmEmailChange'])
+        ->methods(['GET']);
+
+    $routes->add('te4g_user_password_change', '/account/password')
+        ->controller([PasswordController::class, 'change'])
+        ->methods(['GET', 'POST']);
+
+    $routes->add('te4g_user_account_delete', '/account/delete')
+        ->controller([DeleteAccountController::class, 'delete'])
+        ->methods(['POST']);
 };
