@@ -50,7 +50,7 @@ final class GeneratedSkeletonTest extends TestCase
     public function testGeneratedApplicationLintsLoadsMetadataCompilesSecurityAndResolvesRoutes(): void
     {
         file_put_contents($this->projectDir.'/composer.json', <<<'JSON'
-            {"autoload":{"psr-4":{"GeneratedApp\\":"./src/"}}}
+            {"autoload":{"psr-4":{"GeneratedApp\\":"./src/./"}}}
             JSON);
         $files = (new SkeletonRenderer())->renderAll(ProjectLayout::at($this->projectDir));
         $this->write($files);

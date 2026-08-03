@@ -127,13 +127,15 @@ final readonly class SkeletonRenderer
             return false;
         }
 
-        $segments = array_values(array_filter(
-            explode('/', $portablePath),
-            static fn (string $segment): bool => '' !== $segment,
-        ));
-        if ('.' === ($segments[0] ?? null)) {
-            array_shift($segments);
+        $segments = explode('/', $portablePath);
+        if (in_array('..', $segments, true)) {
+            return false;
         }
+
+        $segments = array_values(array_filter(
+            $segments,
+            static fn (string $segment): bool => '' !== $segment && '.' !== $segment,
+        ));
 
         return ['src'] === $segments;
     }
