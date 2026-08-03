@@ -15,7 +15,9 @@ use Te4g\UserBundle\Event\PasswordChangeOrigin;
 use Te4g\UserBundle\Exception\CurrentPasswordInvalid;
 use Te4g\UserBundle\Manager\PasswordManager;
 use Te4g\UserBundle\Tests\Fixtures\Domain\InMemoryAccountRepository;
+use Te4g\UserBundle\Tests\Fixtures\Domain\OperationTrace;
 use Te4g\UserBundle\Tests\Fixtures\Domain\TestAccountUser;
+use Te4g\UserBundle\Tests\Fixtures\Domain\TracingAccountRepository;
 
 final class PasswordManagerTest extends TestCase
 {
@@ -46,10 +48,11 @@ final class PasswordManagerTest extends TestCase
 
     public function testSuccessfulChangeHashesSavesInvalidatesResetsAndDispatchesAuthenticatedEvent(): void
     {
-        $repository = new InMemoryAccountRepository();
-        $resetRequests = new ChangeTestRequestRepository();
-        $hasher = new ChangeTestPasswordHasher(true);
-        $events = new ChangeTestEventDispatcher();
+        $trace = new OperationTrace();
+        $repository = new TracingAccountRepository($trace);
+        $resetRequests = new ChangeTestRequestRepository($trace);
+        $hasher = new ChangeTestPasswordHasher(true, $trace);
+        $events = new ChangeTestEventDispatcher($trace);
         $user = $this->user('ORIGINAL_HASH');
 
         (new PasswordManager($repository, $resetRequests, $hasher, $events))
@@ -60,6 +63,7 @@ final class PasswordManagerTest extends TestCase
         self::assertSame('NEW_PASSWORD_HASH', $user->getPassword());
         self::assertSame([$user], $repository->saved);
         self::assertSame([$user], $resetRequests->removedFor);
+        self::assertSame(['validate', 'hash', 'save', 'remove-account-resets', 'event'], $trace->operations());
         self::assertCount(1, $events->events);
         $event = $events->events[0];
         self::assertInstanceOf(PasswordChangedEvent::class, $event);
@@ -87,12 +91,15 @@ final class ChangeTestPasswordHasher implements UserPasswordHasherInterface
     /** @var list<array{PasswordAuthenticatedUserInterface, string}> */
     public array $hashedPasswords = [];
 
-    public function __construct(private readonly bool $passwordValid)
-    {
+    public function __construct(
+        private readonly bool $passwordValid,
+        private readonly ?OperationTrace $trace = null,
+    ) {
     }
 
     public function hashPassword(PasswordAuthenticatedUserInterface $user, #[\SensitiveParameter] string $plainPassword): string
     {
+        $this->trace?->record('hash');
         $this->hashedPasswords[] = [$user, $plainPassword];
 
         return 'NEW_PASSWORD_HASH';
@@ -100,6 +107,7 @@ final class ChangeTestPasswordHasher implements UserPasswordHasherInterface
 
     public function isPasswordValid(PasswordAuthenticatedUserInterface $user, #[\SensitiveParameter] string $plainPassword): bool
     {
+        $this->trace?->record('validate');
         $this->validatedPasswords[] = [$user, $plainPassword];
 
         return $this->passwordValid;
@@ -115,6 +123,10 @@ final class ChangeTestRequestRepository implements ResetPasswordRequestRepositor
 {
     /** @var list<object> */
     public array $removedFor = [];
+
+    public function __construct(private readonly ?OperationTrace $trace = null)
+    {
+    }
 
     public function createResetPasswordRequest(object $user, \DateTimeInterface $expiresAt, string $selector, string $hashedToken): ResetPasswordRequestInterface
     {
@@ -153,6 +165,7 @@ final class ChangeTestRequestRepository implements ResetPasswordRequestRepositor
 
     public function removeRequests(object $user): void
     {
+        $this->trace?->record('remove-account-resets');
         $this->removedFor[] = $user;
     }
 }
@@ -162,8 +175,13 @@ final class ChangeTestEventDispatcher implements EventDispatcherInterface
     /** @var list<object> */
     public array $events = [];
 
+    public function __construct(private readonly ?OperationTrace $trace = null)
+    {
+    }
+
     public function dispatch(object $event, ?string $eventName = null): object
     {
+        $this->trace?->record('event');
         $this->events[] = $event;
 
         return $event;
