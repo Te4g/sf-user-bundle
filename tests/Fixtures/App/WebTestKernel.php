@@ -13,7 +13,6 @@ use Symfony\Component\Config\Loader\LoaderInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpKernel\Kernel;
-use Symfony\Component\Security\Http\LoginLink\LoginLinkHandlerInterface;
 use Symfony\UX\Turbo\TurboBundle;
 use Symfony\UX\TwigComponent\TwigComponentBundle;
 use SymfonyCasts\Bundle\ResetPassword\Persistence\ResetPasswordRequestRepositoryInterface;
@@ -21,6 +20,9 @@ use SymfonyCasts\Bundle\ResetPassword\ResetPasswordHelperInterface;
 use SymfonyCasts\Bundle\VerifyEmail\VerifyEmailHelperInterface;
 use Te4g\UserBundle\Contract\AccountMailerInterface;
 use Te4g\UserBundle\Contract\AccountRepositoryInterface;
+use Te4g\UserBundle\Contract\AccountUserInterface;
+use Te4g\UserBundle\Security\AccountUserProvider;
+use Te4g\UserBundle\Security\VerifiedAccountUserChecker;
 use Te4g\UserBundle\Te4gUserBundle;
 use Te4g\UserBundle\Tests\Fixtures\Domain\RecordingAccountMailer;
 use Te4g\UserBundle\Tests\Fixtures\Persistence\TestUser;
@@ -77,6 +79,8 @@ final class WebTestKernel extends Kernel
         $temporaryDirectory = $this->temporaryDirectory;
 
         $loader->load(static function (ContainerBuilder $container) use ($temporaryDirectory): void {
+            $container->setParameter('te4g_user.redirects.login_success', 'te4g_user_check_email');
+
             $container->loadFromExtension('framework', [
                 'secret' => 'test-secret',
                 'test' => true,
@@ -86,6 +90,11 @@ final class WebTestKernel extends Kernel
                     'utf8' => true,
                 ],
                 'mailer' => ['dsn' => 'null://null'],
+                'cache' => [
+                    'pools' => [
+                        'cache.te4g_user_login_links' => null,
+                    ],
+                ],
                 'validation' => ['enabled' => true],
                 'form' => ['enabled' => true],
                 'session' => [
@@ -100,16 +109,37 @@ final class WebTestKernel extends Kernel
                 ],
             ]);
             $container->loadFromExtension('security', [
+                'expose_security_errors' => 'none',
                 'password_hashers' => [
-                    'Symfony\\Component\\Security\\Core\\User\\PasswordAuthenticatedUserInterface' => 'auto',
+                    AccountUserInterface::class => 'auto',
                 ],
                 'providers' => [
-                    'test_users' => ['id' => TestUserRepository::class],
+                    'test_users' => ['id' => AccountUserProvider::class],
                 ],
                 'firewalls' => [
                     'main' => [
                         'lazy' => true,
                         'provider' => 'test_users',
+                        'user_checker' => VerifiedAccountUserChecker::class,
+                        'form_login' => [
+                            'login_path' => 'te4g_user_login',
+                            'check_path' => 'te4g_user_login',
+                            'enable_csrf' => true,
+                            'default_target_path' => '%te4g_user.redirects.login_success%',
+                        ],
+                        'login_link' => [
+                            'check_route' => 'te4g_user_login_link_check',
+                            'signature_properties' => ['id', 'email', 'password'],
+                            'lifetime' => 600,
+                            'max_uses' => 1,
+                            'check_post_only' => true,
+                            'used_link_cache' => 'cache.te4g_user_login_links',
+                            'default_target_path' => '%te4g_user.redirects.login_success%',
+                        ],
+                        'logout' => [
+                            'path' => 'te4g_user_logout',
+                            'enable_csrf' => true,
+                        ],
                     ],
                 ],
             ]);
@@ -146,13 +176,15 @@ final class WebTestKernel extends Kernel
                 'enabled' => true,
                 'user_class' => TestUser::class,
                 'account_repository' => TestUserRepository::class,
+                'redirects' => [
+                    'login_success' => 'te4g_user_check_email',
+                ],
             ]);
 
             $container->register(TestUserRepository::class, TestUserRepository::class)
                 ->setAutowired(true)
                 ->setPublic(true);
             $container->register(TestVerifyEmailHelper::class, TestVerifyEmailHelper::class);
-            $container->register(TestLoginLinkHandler::class, TestLoginLinkHandler::class);
             $container->register(TestResetPasswordHelper::class, TestResetPasswordHelper::class)->setAutowired(true);
             $container->register(TestResetPasswordRequestRepository::class, TestResetPasswordRequestRepository::class);
             $container->register(RecordingAccountMailer::class, RecordingAccountMailer::class)->setPublic(true);
@@ -160,7 +192,6 @@ final class WebTestKernel extends Kernel
             $container->setAlias(AccountMailerInterface::class, RecordingAccountMailer::class);
             $container->setAlias('test.'.AccountMailerInterface::class, AccountMailerInterface::class)->setPublic(true);
             $container->setAlias(VerifyEmailHelperInterface::class, TestVerifyEmailHelper::class);
-            $container->setAlias(LoginLinkHandlerInterface::class, TestLoginLinkHandler::class);
             $container->setAlias(ResetPasswordHelperInterface::class, TestResetPasswordHelper::class);
             $container->setAlias(ResetPasswordRequestRepositoryInterface::class, TestResetPasswordRequestRepository::class);
         });
