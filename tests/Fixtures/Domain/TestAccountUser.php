@@ -8,11 +8,18 @@ use Te4g\UserBundle\Contract\AccountUserInterface;
 
 class TestAccountUser implements AccountUserInterface
 {
+    private int|string|null $id = null;
+
     private string $email = 'test@example.com';
 
     public function getId(): int|string|null
     {
-        return null;
+        return $this->id;
+    }
+
+    public function setId(int|string|null $id): void
+    {
+        $this->id = $id;
     }
 
     public function getEmail(): string

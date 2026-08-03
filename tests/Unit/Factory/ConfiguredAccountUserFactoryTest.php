@@ -66,6 +66,7 @@ final class AccountUserRequiringArgument extends TestAccountUser
 {
     public function __construct(string $requiredArgument)
     {
+        unset($requiredArgument);
     }
 }
 
@@ -73,6 +74,7 @@ final class AccountUserWithOptionalArgument extends TestAccountUser
 {
     public function __construct(?string $optionalArgument = null)
     {
+        unset($optionalArgument);
     }
 }
 
