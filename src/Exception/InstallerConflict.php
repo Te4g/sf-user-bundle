@@ -29,6 +29,11 @@ final class InstallerConflict extends \RuntimeException
         return new self('Invalid installer marker region.', 'invalid-marker');
     }
 
+    public static function installerLocked(): self
+    {
+        return new self('Installer conflict.', 'installer-locked');
+    }
+
     public static function forPath(string $relativePath, string $code): self
     {
         return new self('Installer conflict.', $code, $relativePath);

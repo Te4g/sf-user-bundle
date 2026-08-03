@@ -14,7 +14,7 @@ final class MarkerEditor
     {
         if (1 !== preg_match('/^[A-Za-z0-9._-]+$/', $name)
             || str_contains($generated, '/* <te4g-user')
-            || str_contains($generated, self::CLOSE)
+            || str_contains($generated, '/* </te4g-user')
         ) {
             throw InstallerConflict::invalidMarker();
         }

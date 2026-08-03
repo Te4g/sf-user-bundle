@@ -6,8 +6,11 @@ namespace Te4g\UserBundle\Tests\Unit\Installer;
 
 use PHPUnit\Framework\TestCase;
 use Te4g\UserBundle\Exception\InstallerConflict;
+use Te4g\UserBundle\Exception\InstallerRollbackIncomplete;
 use Te4g\UserBundle\Exception\InstallerWriteFailed;
+use Te4g\UserBundle\Installer\InstallationCreateRaceHookInterface;
 use Te4g\UserBundle\Installer\InstallationPlan;
+use Te4g\UserBundle\Installer\InstallationRaceHookInterface;
 use Te4g\UserBundle\Installer\InstallationValidator;
 use Te4g\UserBundle\Installer\InstallationValidatorInterface;
 use Te4g\UserBundle\Installer\PlannedFile;
@@ -51,7 +54,10 @@ final class StagedWriterTest extends TestCase
         self::assertSame("<?php\nreturn 2;\n", file_get_contents($this->projectDir.'/src/Existing.php'));
         self::assertSame(0600, fileperms($this->projectDir.'/src/Existing.php') & 0777);
         self::assertSame(0644, fileperms($this->projectDir.'/config/new.json') & 0777);
-        self::assertSame([], glob($this->projectDir.'/var/te4g-user-installer/*') ?: []);
+        self::assertSame(
+            [$this->projectDir.'/var/te4g-user-installer/install.lock'],
+            glob($this->projectDir.'/var/te4g-user-installer/*') ?: [],
+        );
     }
 
     public function testInvalidStagedYamlWritesNothing(): void
@@ -87,6 +93,7 @@ final class StagedWriterTest extends TestCase
             } catch (InstallerWriteFailed $exception) {
                 self::assertSame('Installer validation failed.', $exception->getMessage());
                 self::assertStringNotContainsString($contents, $exception->getMessage());
+                self::assertNull($exception->getPrevious());
             }
 
             self::assertFileDoesNotExist($this->projectDir.'/'.$relativePath);
@@ -242,9 +249,343 @@ final class StagedWriterTest extends TestCase
         self::assertFileDoesNotExist($this->projectDir.'/var');
     }
 
+    public function testCreateRaceNeverClobbersACompetingApplicationFile(): void
+    {
+        $hook = new class () implements InstallationCreateRaceHookInterface, InstallationRaceHookInterface {
+            public function beforeTargetWrite(ProjectLayout $layout, PlannedFile $file): void
+            {
+            }
+
+            public function beforeCreateLink(ProjectLayout $layout, PlannedFile $file): void
+            {
+                $path = $layout->path($file->relativePath());
+                file_put_contents($path, 'competing application file');
+            }
+
+            public function beforeRollback(ProjectLayout $layout, string $relativePath): void
+            {
+            }
+        };
+        $plan = InstallationPlan::forLayout($this->layout, [
+            PlannedFile::create('created.txt', 'generated'),
+        ]);
+
+        $this->expectException(InstallerConflict::class);
+
+        try {
+            (new StagedWriter($this->validator(), $hook))->apply($plan);
+        } finally {
+            self::assertSame('competing application file', file_get_contents($this->projectDir.'/created.txt'));
+        }
+    }
+
+    public function testManagedTargetRaceIsDetectedImmediatelyBeforeWrite(): void
+    {
+        $this->write('managed.txt', 'generated original');
+        $hook = new class () implements InstallationRaceHookInterface {
+            public function beforeTargetWrite(ProjectLayout $layout, PlannedFile $file): void
+            {
+                file_put_contents($layout->path($file->relativePath()), 'concurrent application edit');
+            }
+
+            public function beforeRollback(ProjectLayout $layout, string $relativePath): void
+            {
+            }
+        };
+        $plan = InstallationPlan::forLayout($this->layout, [
+            PlannedFile::managedUpdate('managed.txt', hash('sha256', 'generated original'), 'generated update'),
+        ]);
+
+        $this->expectException(InstallerConflict::class);
+
+        try {
+            (new StagedWriter($this->validator(), $hook))->apply($plan);
+        } finally {
+            self::assertSame('concurrent application edit', file_get_contents($this->projectDir.'/managed.txt'));
+        }
+    }
+
+    public function testAncestorSwapIsDetectedImmediatelyBeforeWrite(): void
+    {
+        mkdir($this->projectDir.'/existing-parent');
+        $hook = new class () implements InstallationRaceHookInterface {
+            public function beforeTargetWrite(ProjectLayout $layout, PlannedFile $file): void
+            {
+                $parent = dirname($layout->path($file->relativePath()));
+                rename($parent, $parent.'-application');
+                mkdir($parent);
+            }
+
+            public function beforeRollback(ProjectLayout $layout, string $relativePath): void
+            {
+            }
+        };
+
+        $this->expectException(InstallerConflict::class);
+
+        try {
+            (new StagedWriter($this->validator(), $hook))->apply(InstallationPlan::forLayout($this->layout, [
+                PlannedFile::create('existing-parent/generated.txt', 'generated'),
+            ]));
+        } finally {
+            self::assertFileDoesNotExist($this->projectDir.'/existing-parent/generated.txt');
+            self::assertFileDoesNotExist($this->projectDir.'/existing-parent-application/generated.txt');
+        }
+    }
+
+    public function testProjectLockRejectsASecondCooperatingWriterUntilCommit(): void
+    {
+        $firstResult = $this->writer()->apply(InstallationPlan::forLayout($this->layout, [
+            PlannedFile::create('first.txt', 'first'),
+        ]));
+
+        try {
+            $this->writer()->apply(InstallationPlan::forLayout($this->layout, [
+                PlannedFile::create('second.txt', 'second'),
+            ]));
+            self::fail('The second writer must not enter while the first result owns the lock.');
+        } catch (InstallerConflict $exception) {
+            self::assertSame('installer-locked', $exception->code());
+            self::assertFileDoesNotExist($this->projectDir.'/second.txt');
+        }
+
+        $firstResult->commit();
+        $secondResult = $this->writer()->apply(InstallationPlan::forLayout($this->layout, [
+            PlannedFile::create('second.txt', 'second'),
+        ]));
+        $secondResult->commit();
+
+        self::assertSame('second', file_get_contents($this->projectDir.'/second.txt'));
+    }
+
+    public function testRollbackNeverDeletesAUserEditedCreatedFile(): void
+    {
+        $result = $this->writer()->apply(InstallationPlan::forLayout($this->layout, [
+            PlannedFile::create('created.txt', 'generated'),
+        ]));
+        file_put_contents($this->projectDir.'/created.txt', 'later application edit');
+
+        try {
+            $result->rollback();
+            self::fail('Rollback must report the ownership conflict.');
+        } catch (InstallerRollbackIncomplete $exception) {
+            self::assertSame('Installer rollback incomplete.', $exception->getMessage());
+            self::assertSame('requested', $exception->primaryOutcome());
+            self::assertSame('ownership-conflict', $exception->rollbackOutcome());
+            self::assertNull($exception->getPrevious());
+        }
+
+        self::assertSame('later application edit', file_get_contents($this->projectDir.'/created.txt'));
+    }
+
+    public function testRollbackNeverOverwritesAUserEditedManagedFile(): void
+    {
+        $this->write('managed.txt', 'generated original');
+        $result = $this->writer()->apply(InstallationPlan::forLayout($this->layout, [
+            PlannedFile::managedUpdate('managed.txt', hash('sha256', 'generated original'), 'generated update'),
+        ]));
+        file_put_contents($this->projectDir.'/managed.txt', 'later application edit');
+
+        $this->expectException(InstallerRollbackIncomplete::class);
+
+        try {
+            $result->rollback();
+        } finally {
+            self::assertSame('later application edit', file_get_contents($this->projectDir.'/managed.txt'));
+        }
+    }
+
+    public function testRollbackRejectsSameContentTargetReplacementByIdentity(): void
+    {
+        $result = $this->writer()->apply(InstallationPlan::forLayout($this->layout, [
+            PlannedFile::create('created.txt', 'generated'),
+        ]));
+        $replacement = $this->projectDir.'/replacement';
+        file_put_contents($replacement, 'generated');
+        rename($replacement, $this->projectDir.'/created.txt');
+
+        $this->expectException(InstallerRollbackIncomplete::class);
+
+        try {
+            $result->rollback();
+        } finally {
+            self::assertSame('generated', file_get_contents($this->projectDir.'/created.txt'));
+        }
+    }
+
+    public function testRollbackRejectsAncestorReplacementBeforeRemovingGeneratedFile(): void
+    {
+        mkdir($this->projectDir.'/existing-parent');
+        $hook = new class () implements InstallationRaceHookInterface {
+            public function beforeTargetWrite(ProjectLayout $layout, PlannedFile $file): void
+            {
+            }
+
+            public function beforeRollback(ProjectLayout $layout, string $relativePath): void
+            {
+                $parent = dirname($layout->path($relativePath));
+                rename($parent, $parent.'-application');
+                mkdir($parent);
+            }
+        };
+        $result = (new StagedWriter($this->validator(), $hook))->apply(InstallationPlan::forLayout($this->layout, [
+            PlannedFile::create('existing-parent/generated.txt', 'generated'),
+        ]));
+
+        $this->expectException(InstallerRollbackIncomplete::class);
+
+        try {
+            $result->rollback();
+        } finally {
+            self::assertFileDoesNotExist($this->projectDir.'/existing-parent/generated.txt');
+            self::assertSame('generated', file_get_contents($this->projectDir.'/existing-parent-application/generated.txt'));
+        }
+    }
+
+    public function testInternalApplySurfacesRollbackFailureWithoutLeakingPrimaryOrRollbackSecrets(): void
+    {
+        $validator = new class () implements InstallationValidatorInterface {
+            public function validate(string $absolutePath, string $relativePath): void
+            {
+                if (!str_contains($absolutePath, '/var/te4g-user-installer/')) {
+                    throw new \RuntimeException('PRIMARY-SENTINEL-SECRET');
+                }
+            }
+        };
+        $hook = new class () implements InstallationRaceHookInterface {
+            public function beforeTargetWrite(ProjectLayout $layout, PlannedFile $file): void
+            {
+            }
+
+            public function beforeRollback(ProjectLayout $layout, string $relativePath): void
+            {
+                throw new \RuntimeException('ROLLBACK-SENTINEL-SECRET');
+            }
+        };
+
+        try {
+            (new StagedWriter($validator, $hook))->apply(InstallationPlan::forLayout($this->layout, [
+                PlannedFile::create('created.txt', 'generated'),
+            ]));
+            self::fail('Both the primary and rollback operations must fail.');
+        } catch (InstallerRollbackIncomplete $exception) {
+            self::assertSame('write-failed', $exception->primaryOutcome());
+            self::assertSame('operation-failed', $exception->rollbackOutcome());
+            self::assertNull($exception->getPrevious());
+            self::assertStringNotContainsString('PRIMARY-SENTINEL-SECRET', (string) $exception);
+            self::assertStringNotContainsString('ROLLBACK-SENTINEL-SECRET', (string) $exception);
+        }
+
+        self::assertSame('generated', file_get_contents($this->projectDir.'/created.txt'));
+    }
+
+    public function testDirectRollbackContinuesAfterRestoreFailureAndSurfacesIncompleteState(): void
+    {
+        $this->write('managed.txt', 'original');
+        $hook = new class () implements InstallationRaceHookInterface {
+            public function beforeTargetWrite(ProjectLayout $layout, PlannedFile $file): void
+            {
+            }
+
+            public function beforeRollback(ProjectLayout $layout, string $relativePath): void
+            {
+                if ('managed.txt' === $relativePath) {
+                    throw new \RuntimeException('RESTORE-SENTINEL-SECRET');
+                }
+            }
+        };
+        $result = (new StagedWriter($this->validator(), $hook))->apply(InstallationPlan::forLayout($this->layout, [
+            PlannedFile::managedUpdate('managed.txt', hash('sha256', 'original'), 'updated'),
+            PlannedFile::create('created.txt', 'created'),
+        ]));
+
+        try {
+            $result->rollback();
+            self::fail('The failed restore must surface incomplete rollback.');
+        } catch (InstallerRollbackIncomplete $exception) {
+            self::assertSame('operation-failed', $exception->rollbackOutcome());
+            self::assertNull($exception->getPrevious());
+            self::assertStringNotContainsString('RESTORE-SENTINEL-SECRET', (string) $exception);
+        }
+
+        self::assertSame('updated', file_get_contents($this->projectDir.'/managed.txt'));
+        self::assertFileDoesNotExist($this->projectDir.'/created.txt');
+    }
+
+    public function testDirectRollbackContinuesAfterRemoveFailureAndSurfacesIncompleteState(): void
+    {
+        $this->write('managed.txt', 'original');
+        $hook = new class () implements InstallationRaceHookInterface {
+            public function beforeTargetWrite(ProjectLayout $layout, PlannedFile $file): void
+            {
+            }
+
+            public function beforeRollback(ProjectLayout $layout, string $relativePath): void
+            {
+                if ('created.txt' === $relativePath) {
+                    throw new \RuntimeException('REMOVE-SENTINEL-SECRET');
+                }
+            }
+        };
+        $result = (new StagedWriter($this->validator(), $hook))->apply(InstallationPlan::forLayout($this->layout, [
+            PlannedFile::managedUpdate('managed.txt', hash('sha256', 'original'), 'updated'),
+            PlannedFile::create('created.txt', 'created'),
+        ]));
+
+        $this->expectException(InstallerRollbackIncomplete::class);
+
+        try {
+            $result->rollback();
+        } finally {
+            self::assertSame('original', file_get_contents($this->projectDir.'/managed.txt'));
+            self::assertSame('created', file_get_contents($this->projectDir.'/created.txt'));
+        }
+    }
+
+    public function testValidatorExceptionsContainNoPreviousParserOrPathSecrets(): void
+    {
+        $validator = $this->validator();
+        $sentinelPath = $this->projectDir.'/ABSOLUTE-PATH-SENTINEL.yaml';
+        file_put_contents($sentinelPath, "secret: [YAML-SOURCE-SENTINEL\n");
+
+        try {
+            $validator->validate($sentinelPath, 'config/safe.yaml');
+            self::fail('The malformed YAML must fail validation.');
+        } catch (InstallerWriteFailed $exception) {
+            self::assertNull($exception->getPrevious());
+            self::assertStringNotContainsString('ABSOLUTE-PATH-SENTINEL', (string) $exception);
+            self::assertStringNotContainsString('YAML-SOURCE-SENTINEL', (string) $exception);
+        }
+
+        $missingPath = $this->projectDir.'/MISSING-PATH-SENTINEL.json';
+        try {
+            $validator->validate($missingPath, 'config/safe.json');
+            self::fail('The missing file must fail validation.');
+        } catch (InstallerWriteFailed $exception) {
+            self::assertNull($exception->getPrevious());
+            self::assertStringNotContainsString('MISSING-PATH-SENTINEL', (string) $exception);
+        }
+
+        $twigPath = $this->projectDir.'/TWIG-PATH-SENTINEL.html.twig';
+        file_put_contents($twigPath, '{% TWIG-SOURCE-SENTINEL %}');
+        try {
+            $validator->validate($twigPath, 'templates/safe.html.twig');
+            self::fail('The invalid Twig source must fail validation.');
+        } catch (InstallerWriteFailed $exception) {
+            self::assertNull($exception->getPrevious());
+            self::assertStringNotContainsString('TWIG-PATH-SENTINEL', (string) $exception);
+            self::assertStringNotContainsString('TWIG-SOURCE-SENTINEL', (string) $exception);
+        }
+    }
+
     private function writer(): StagedWriter
     {
-        return new StagedWriter(new InstallationValidator(new Environment(new ArrayLoader())));
+        return new StagedWriter($this->validator());
+    }
+
+    private function validator(): InstallationValidator
+    {
+        return new InstallationValidator(new Environment(new ArrayLoader()));
     }
 
     private function write(string $relativePath, string $contents, int $mode = 0644): void
