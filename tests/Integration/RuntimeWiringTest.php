@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace Te4g\UserBundle\Tests\Integration;
 
 use PHPUnit\Framework\TestCase;
+use Te4g\UserBundle\Contract\AccountMailerInterface;
 use Te4g\UserBundle\Contract\AccountRepositoryInterface;
 use Te4g\UserBundle\Contract\AccountUserFactoryInterface;
 use Te4g\UserBundle\Tests\Fixtures\App\TestKernel;
 use Te4g\UserBundle\Tests\Fixtures\App\WebTestKernel;
 use Te4g\UserBundle\Tests\Fixtures\Domain\FakeAccountUserFactory;
 use Te4g\UserBundle\Tests\Fixtures\Domain\InMemoryAccountRepository;
+use Te4g\UserBundle\Tests\Fixtures\Domain\RecordingAccountMailer;
 use Te4g\UserBundle\Tests\Fixtures\Persistence\TestUserRepository;
 
 final class RuntimeWiringTest extends TestCase
@@ -30,6 +32,10 @@ final class RuntimeWiringTest extends TestCase
             self::assertInstanceOf(
                 FakeAccountUserFactory::class,
                 $container->get('test.'.AccountUserFactoryInterface::class),
+            );
+            self::assertInstanceOf(
+                RecordingAccountMailer::class,
+                $container->get('test.'.AccountMailerInterface::class),
             );
         } finally {
             $kernel->shutdown();
