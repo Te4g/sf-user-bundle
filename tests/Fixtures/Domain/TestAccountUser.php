@@ -14,6 +14,8 @@ class TestAccountUser implements AccountUserInterface
 
     private ?string $password = null;
 
+    private ?string $pendingEmail = null;
+
     private bool $verified = false;
 
     public function getId(): int|string|null
@@ -38,11 +40,12 @@ class TestAccountUser implements AccountUserInterface
 
     public function getPendingEmail(): ?string
     {
-        return null;
+        return $this->pendingEmail;
     }
 
     public function setPendingEmail(?string $email): void
     {
+        $this->pendingEmail = $email;
     }
 
     public function getPassword(): ?string
