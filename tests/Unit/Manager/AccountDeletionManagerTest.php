@@ -168,6 +168,35 @@ final class AccountDeletionManagerTest extends TestCase
         ]], $logger->records);
     }
 
+    public function testAfterListenerAndLoggerFailuresStayContainedAfterCompletedDeletion(): void
+    {
+        $trace = new OperationTrace();
+        $repository = new DeletionTestRepository($trace, mutateOnRemove: true);
+        $events = new DeletionTestEventDispatcher($trace, failAfter: true);
+        $logger = new DeletionTestLogger(throwOnLog: true);
+        $user = $this->user('account-41', 'user@example.com');
+        $repository->store($user);
+        $trace->clear();
+
+        $this->manager($repository, new DeletionTestPasswordHasher(true, $trace), [], $events, $logger)
+            ->delete($user, 'valid-password');
+
+        self::assertSame([$user], $repository->removed);
+        self::assertNull($repository->findOneByEmail('user@example.com'));
+        self::assertSame(['validate-password', 'event:before', 'remove', 'event:after', 'lookup:user@example.com'], $trace->operations());
+        self::assertCount(1, $events->afterAttempts);
+        self::assertSame('account-41', $events->afterAttempts[0]->getAccountId());
+        self::assertSame('user@example.com', $events->afterAttempts[0]->getEmail());
+        self::assertSame([[
+            'level' => LogLevel::ERROR,
+            'message' => 'An after-account-deleted listener failed after persistence completed.',
+            'context' => ['exception_class' => \RuntimeException::class],
+        ]], $logger->records);
+        self::assertStringNotContainsString('user@example.com', serialize($logger->records));
+        self::assertStringNotContainsString('listener leaked', serialize($logger->records));
+        self::assertStringNotContainsString('logger transport leaked', serialize($logger->records));
+    }
+
     /** @param iterable<AccountDeletionGuardInterface> $guards */
     private function manager(
         DeletionTestRepository $repository,
@@ -313,6 +342,9 @@ final class DeletionTestGuard implements AccountDeletionGuardInterface
 
 final class DeletionTestEventDispatcher implements EventDispatcherInterface
 {
+    /** @var list<AfterAccountDeletedEvent> */
+    public array $afterAttempts = [];
+
     /** @var list<object> */
     public array $events = [];
 
@@ -330,6 +362,7 @@ final class DeletionTestEventDispatcher implements EventDispatcherInterface
 
         if ($event instanceof AfterAccountDeletedEvent) {
             $this->trace?->record('event:after');
+            $this->afterAttempts[] = $event;
 
             if ($this->failAfter) {
                 throw new \RuntimeException('listener leaked user@example.com');
@@ -347,6 +380,10 @@ final class DeletionTestLogger extends AbstractLogger
     /** @var list<array{level: mixed, message: string, context: array<string, mixed>}> */
     public array $records = [];
 
+    public function __construct(private readonly bool $throwOnLog = false)
+    {
+    }
+
     /** @param array<string, mixed> $context */
     public function log($level, string|\Stringable $message, array $context = []): void
     {
@@ -355,5 +392,9 @@ final class DeletionTestLogger extends AbstractLogger
             'message' => (string) $message,
             'context' => $context,
         ];
+
+        if ($this->throwOnLog) {
+            throw new \RuntimeException('logger transport leaked logger-secret@example.com');
+        }
     }
 }
