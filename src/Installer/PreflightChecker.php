@@ -10,6 +10,8 @@ use Te4g\UserBundle\Exception\InstallerConflict;
 
 final readonly class PreflightChecker
 {
+    private const string TAILWIND_RUNTIME_PREFIX = 'var/tailwind/';
+
     /** @var list<string> */
     private const array REQUIRED_BUNDLES = [
         'Doctrine\\Bundle\\DoctrineBundle\\DoctrineBundle',
@@ -196,6 +198,9 @@ final readonly class PreflightChecker
         }
 
         foreach ($manifest->files() as $relativePath => $expectedHash) {
+            if (str_starts_with($relativePath, self::TAILWIND_RUNTIME_PREFIX)) {
+                continue;
+            }
             try {
                 $path = $layout->path($relativePath);
             } catch (InstallerConflict) {
@@ -263,7 +268,7 @@ final readonly class PreflightChecker
             new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS),
         );
         foreach ($iterator as $info) {
-            if (!$info->isFile() || $info->isLink() || !preg_match('/\.ya?ml$/i', $info->getFilename())) {
+            if (!$info->isFile() || $info->isLink() || !preg_match('/\.(?:php|ya?ml)$/i', $info->getFilename())) {
                 continue;
             }
             $files[] = $info->getPathname();
@@ -275,6 +280,11 @@ final readonly class PreflightChecker
                 '/',
                 substr($path, strlen($layout->projectDir()) + 1),
             );
+            if (str_ends_with(strtolower($path), '.php')) {
+                $this->checkAssetMapperPhp($path, $relativePath, $layout, $add);
+
+                continue;
+            }
             try {
                 $config = Yaml::parseFile($path);
             } catch (\Throwable) {
@@ -282,6 +292,81 @@ final readonly class PreflightChecker
             }
             if (is_array($config)) {
                 $this->checkAssetMapperNode($config, $layout, $relativePath, $add);
+            }
+        }
+    }
+
+    /** @param callable(InstallerConflict): void $add */
+    private function checkAssetMapperPhp(
+        string $path,
+        string $relativePath,
+        ProjectLayout $layout,
+        callable $add,
+    ): void {
+        $contents = file_get_contents($path);
+        if (!is_string($contents)) {
+            $add(InstallerConflict::forPath($relativePath, 'uninspectable-asset-mapper-configuration'));
+
+            return;
+        }
+
+        try {
+            $tokens = array_values(\PhpToken::tokenize($contents, TOKEN_PARSE));
+        } catch (\Throwable) {
+            $add(InstallerConflict::forPath($relativePath, 'uninspectable-asset-mapper-configuration'));
+
+            return;
+        }
+
+        $hasAssetMapper = false;
+        /** @var list<int> $storageCalls */
+        $storageCalls = [];
+        foreach ($tokens as $index => $token) {
+            if (T_STRING !== $token->id || !$this->isPhpMethodCall($tokens, $index)) {
+                continue;
+            }
+
+            $method = strtolower($token->text);
+            if ('assetmapper' === $method) {
+                $hasAssetMapper = true;
+            } elseif (in_array($method, ['importmappath', 'vendordir'], true)) {
+                $storageCalls[] = $index;
+            }
+        }
+        if (!$hasAssetMapper) {
+            return;
+        }
+
+        foreach ($storageCalls as $index) {
+            $method = strtolower($tokens[$index]->text);
+            $open = $this->nextPhpToken($tokens, $index + 1);
+            $value = null === $open ? null : $this->nextPhpToken($tokens, $open + 1);
+            $close = null === $value ? null : $this->nextPhpToken($tokens, $value + 1);
+            if (null === $open
+                || '(' !== $tokens[$open]->text
+                || null === $value
+                || T_CONSTANT_ENCAPSED_STRING !== $tokens[$value]->id
+                || null === $close
+                || ')' !== $tokens[$close]->text
+            ) {
+                $add(InstallerConflict::forPath($relativePath, 'uninspectable-asset-mapper-configuration'));
+
+                continue;
+            }
+
+            $literal = $this->phpStringLiteral($tokens[$value]->text);
+            if (null === $literal) {
+                $add(InstallerConflict::forPath($relativePath, 'uninspectable-asset-mapper-configuration'));
+
+                continue;
+            }
+
+            $key = 'importmappath' === $method ? 'importmap_path' : 'vendor_dir';
+            if (!in_array($literal, $this->allowedAssetMapperPaths($key, $layout), true)) {
+                $add(InstallerConflict::forPath(
+                    $relativePath,
+                    'asset-mapper-'.str_replace('_', '-', $key).'-conflict',
+                ));
             }
         }
     }
@@ -312,12 +397,10 @@ final readonly class PreflightChecker
             return;
         }
 
-        foreach ([
-            'importmap_path' => ['%kernel.project_dir%/importmap.php', $layout->projectDir().'/importmap.php'],
-            'vendor_dir' => ['%kernel.project_dir%/assets/vendor', $layout->projectDir().'/assets/vendor'],
-        ] as $key => $allowed) {
+        foreach (['importmap_path', 'vendor_dir'] as $key) {
             if (array_key_exists($key, $assetMapper)
-                && (!is_string($assetMapper[$key]) || !in_array($assetMapper[$key], $allowed, true))
+                && (!is_string($assetMapper[$key])
+                    || !in_array($assetMapper[$key], $this->allowedAssetMapperPaths($key, $layout), true))
             ) {
                 $add(InstallerConflict::forPath(
                     $relativePath,
@@ -325,6 +408,66 @@ final readonly class PreflightChecker
                 ));
             }
         }
+    }
+
+    /** @return list<string> */
+    private function allowedAssetMapperPaths(string $key, ProjectLayout $layout): array
+    {
+        return 'importmap_path' === $key
+            ? ['%kernel.project_dir%/importmap.php', $layout->projectDir().'/importmap.php']
+            : ['%kernel.project_dir%/assets/vendor', $layout->projectDir().'/assets/vendor'];
+    }
+
+    /** @param list<\PhpToken> $tokens */
+    private function isPhpMethodCall(array $tokens, int $index): bool
+    {
+        $previous = $this->previousPhpToken($tokens, $index - 1);
+        $next = $this->nextPhpToken($tokens, $index + 1);
+
+        return null !== $previous
+            && in_array($tokens[$previous]->id, [T_OBJECT_OPERATOR, T_NULLSAFE_OBJECT_OPERATOR], true)
+            && null !== $next
+            && '(' === $tokens[$next]->text;
+    }
+
+    /** @param list<\PhpToken> $tokens */
+    private function previousPhpToken(array $tokens, int $offset): ?int
+    {
+        for ($index = $offset; $index >= 0; --$index) {
+            if (!in_array($tokens[$index]->id, [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true)) {
+                return $index;
+            }
+        }
+
+        return null;
+    }
+
+    /** @param list<\PhpToken> $tokens */
+    private function nextPhpToken(array $tokens, int $offset): ?int
+    {
+        for ($index = $offset, $count = count($tokens); $index < $count; ++$index) {
+            if (!in_array($tokens[$index]->id, [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true)) {
+                return $index;
+            }
+        }
+
+        return null;
+    }
+
+    private function phpStringLiteral(string $literal): ?string
+    {
+        if (strlen($literal) < 2 || !in_array($literal[0], ["'", '"'], true)) {
+            return null;
+        }
+        $value = substr($literal, 1, -1);
+        if ("'" === $literal[0]) {
+            return str_replace(['\\\\', "\\'"], ['\\', "'"], $value);
+        }
+        if (1 === preg_match('/\\\\(?![\\\\"])/', $value)) {
+            return null;
+        }
+
+        return strtr($value, ['\\\\' => '\\', '\\"' => '"']);
     }
 
     /** @return list<string> */

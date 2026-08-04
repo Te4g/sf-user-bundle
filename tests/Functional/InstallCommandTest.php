@@ -230,6 +230,70 @@ final class InstallCommandTest extends TestCase
         self::assertArrayNotHasKey($this->tailwindBinaryPath(), $updated['files']);
     }
 
+    public function testMissingLegacyTailwindCacheManifestEntriesDoNotBlockCleanup(): void
+    {
+        self::assertSame(
+            Command::SUCCESS,
+            $this->command(
+                new InstallerCommandProcessRunner($this->projectDir),
+                new InstallerCommandMigrationGenerator($this->projectDir),
+            )->execute(['--no-interaction' => true], ['interactive' => false]),
+        );
+        $manifest = json_decode($this->read(ManifestStore::RELATIVE_PATH), true, 512, JSON_THROW_ON_ERROR);
+        $manifest['files']['var/tailwind/app.built.css'] = hash_file('sha256', $this->projectDir.'/var/tailwind/app.built.css');
+        $manifest['files'][$this->tailwindBinaryPath()] = hash_file('sha256', $this->projectDir.'/'.$this->tailwindBinaryPath());
+        ksort($manifest['files'], SORT_STRING);
+        $this->write(ManifestStore::RELATIVE_PATH, json_encode(
+            $manifest,
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR,
+        )."\n");
+        unlink($this->projectDir.'/var/tailwind/app.built.css');
+        unlink($this->projectDir.'/'.$this->tailwindBinaryPath());
+
+        $tester = $this->command(
+            new InstallerCommandProcessRunner($this->projectDir),
+            new InstallerCommandMigrationGenerator($this->projectDir),
+        );
+        $status = $tester->execute(['--no-interaction' => true], ['interactive' => false]);
+
+        self::assertSame(Command::SUCCESS, $status, $tester->getDisplay());
+        $updated = json_decode($this->read(ManifestStore::RELATIVE_PATH), true, 512, JSON_THROW_ON_ERROR);
+        self::assertArrayNotHasKey('var/tailwind/app.built.css', $updated['files']);
+        self::assertArrayNotHasKey($this->tailwindBinaryPath(), $updated['files']);
+    }
+
+    public function testChangedLegacyTailwindCacheManifestEntriesDoNotBlockCleanup(): void
+    {
+        self::assertSame(
+            Command::SUCCESS,
+            $this->command(
+                new InstallerCommandProcessRunner($this->projectDir),
+                new InstallerCommandMigrationGenerator($this->projectDir),
+            )->execute(['--no-interaction' => true], ['interactive' => false]),
+        );
+        $manifest = json_decode($this->read(ManifestStore::RELATIVE_PATH), true, 512, JSON_THROW_ON_ERROR);
+        $manifest['files']['var/tailwind/app.built.css'] = hash_file('sha256', $this->projectDir.'/var/tailwind/app.built.css');
+        $manifest['files'][$this->tailwindBinaryPath()] = hash_file('sha256', $this->projectDir.'/'.$this->tailwindBinaryPath());
+        ksort($manifest['files'], SORT_STRING);
+        $this->write(ManifestStore::RELATIVE_PATH, json_encode(
+            $manifest,
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR,
+        )."\n");
+        $this->write('var/tailwind/app.built.css', 'changed runtime output');
+        $this->write($this->tailwindBinaryPath(), 'changed runtime binary');
+
+        $tester = $this->command(
+            new InstallerCommandProcessRunner($this->projectDir),
+            new InstallerCommandMigrationGenerator($this->projectDir),
+        );
+        $status = $tester->execute(['--no-interaction' => true], ['interactive' => false]);
+
+        self::assertSame(Command::SUCCESS, $status, $tester->getDisplay());
+        $updated = json_decode($this->read(ManifestStore::RELATIVE_PATH), true, 512, JSON_THROW_ON_ERROR);
+        self::assertArrayNotHasKey('var/tailwind/app.built.css', $updated['files']);
+        self::assertArrayNotHasKey($this->tailwindBinaryPath(), $updated['files']);
+    }
+
     public function testRepeatInstallWithApplicationManagedTailwindIsANoOp(): void
     {
         $this->write('config/packages/symfonycasts_tailwind.yaml', <<<'YAML'
@@ -309,6 +373,125 @@ final class InstallCommandTest extends TestCase
         self::assertSame($beforeRepeat, $this->inventory());
         self::assertSame([], $runner->calls);
         self::assertSame(0, $migration->calls);
+    }
+
+    public function testArbitraryProjectLocalImportmapAssetsRemainApplicationOwnedAndRepeatIsANoOp(): void
+    {
+        $this->write('importmap.php', <<<'PHP'
+            <?php
+
+            return [
+                'app' => ['path' => './assets/app.js', 'entrypoint' => true],
+                'shadcn/dist/tailwind.css' => ['path' => './assets/styles/application-shadcn.css'],
+                'tw-animate-css/dist/tw-animate.css' => ['path' => 'assets/styles/application-animations.css'],
+            ];
+            PHP);
+        $this->write('assets/styles/application-shadcn.css', "application shadcn\n");
+        $this->write('assets/styles/application-animations.css', "application animation\n");
+        $applicationFiles = [
+            'importmap.php' => $this->read('importmap.php'),
+            'assets/styles/application-shadcn.css' => $this->read('assets/styles/application-shadcn.css'),
+            'assets/styles/application-animations.css' => $this->read('assets/styles/application-animations.css'),
+        ];
+
+        $firstRunner = new InstallerCommandProcessRunner($this->projectDir);
+        $first = $this->command($firstRunner, new InstallerCommandMigrationGenerator($this->projectDir));
+        self::assertSame(
+            Command::SUCCESS,
+            $first->execute(['--no-interaction' => true], ['interactive' => false]),
+            $first->getDisplay(),
+        );
+        self::assertNotContains('importmap:require', array_column($firstRunner->calls, 'name'));
+        $manifest = json_decode($this->read(ManifestStore::RELATIVE_PATH), true, 512, JSON_THROW_ON_ERROR);
+        foreach ($applicationFiles as $relativePath => $contents) {
+            self::assertSame($contents, $this->read($relativePath));
+            self::assertArrayNotHasKey($relativePath, $manifest['files']);
+        }
+
+        $beforeRepeat = $this->inventory();
+        $runner = new InstallerCommandProcessRunner($this->projectDir);
+        $migration = new InstallerCommandMigrationGenerator($this->projectDir);
+        $repeat = $this->command($runner, $migration);
+        $status = $repeat->execute(['--no-interaction' => true], ['interactive' => false]);
+
+        self::assertSame(Command::SUCCESS, $status, $repeat->getDisplay());
+        self::assertStringContainsString('Already installed; no changes required.', $repeat->getDisplay());
+        self::assertSame($beforeRepeat, $this->inventory());
+        self::assertSame([], $runner->calls);
+        self::assertSame(0, $migration->calls);
+    }
+
+    public function testTraversingApplicationImportmapAssetFailsClosedBeforeProcesses(): void
+    {
+        $this->write('importmap.php', <<<'PHP'
+            <?php
+
+            return [
+                'app' => ['path' => './assets/app.js', 'entrypoint' => true],
+                'shadcn/dist/tailwind.css' => ['path' => '../outside.css'],
+            ];
+            PHP);
+        $runner = new InstallerCommandProcessRunner($this->projectDir);
+        $migration = new InstallerCommandMigrationGenerator($this->projectDir);
+        $tester = $this->command($runner, $migration);
+
+        $status = $tester->execute(['--no-interaction' => true], ['interactive' => false]);
+
+        self::assertSame(Command::FAILURE, $status);
+        self::assertSame([], $runner->calls);
+        self::assertSame(0, $migration->calls);
+        self::assertFileDoesNotExist($this->projectDir.'/src/Entity/User.php');
+    }
+
+    public function testSymlinkedApplicationImportmapAssetFailsClosedBeforeProcesses(): void
+    {
+        $outside = sys_get_temp_dir().'/te4g-user-importmap-outside-'.bin2hex(random_bytes(8)).'.css';
+        file_put_contents($outside, 'outside');
+        symlink($outside, $this->projectDir.'/assets/styles/application-shadcn.css');
+        $this->write('importmap.php', <<<'PHP'
+            <?php
+
+            return [
+                'app' => ['path' => './assets/app.js', 'entrypoint' => true],
+                'shadcn/dist/tailwind.css' => ['path' => './assets/styles/application-shadcn.css'],
+            ];
+            PHP);
+        $runner = new InstallerCommandProcessRunner($this->projectDir);
+        $migration = new InstallerCommandMigrationGenerator($this->projectDir);
+
+        try {
+            $tester = $this->command($runner, $migration);
+            $status = $tester->execute(['--no-interaction' => true], ['interactive' => false]);
+
+            self::assertSame(Command::FAILURE, $status);
+            self::assertSame([], $runner->calls);
+            self::assertSame(0, $migration->calls);
+            self::assertSame('outside', file_get_contents($outside));
+        } finally {
+            unlink($outside);
+        }
+    }
+
+    public function testDynamicApplicationImportmapAssetFailsClosedBeforeProcesses(): void
+    {
+        $this->write('importmap.php', <<<'PHP'
+            <?php
+
+            return [
+                'app' => ['path' => './assets/app.js', 'entrypoint' => true],
+                'shadcn/dist/tailwind.css' => ['path' => application_shadcn_path()],
+            ];
+            PHP);
+        $runner = new InstallerCommandProcessRunner($this->projectDir);
+        $migration = new InstallerCommandMigrationGenerator($this->projectDir);
+        $tester = $this->command($runner, $migration);
+
+        $status = $tester->execute(['--no-interaction' => true], ['interactive' => false]);
+
+        self::assertSame(Command::FAILURE, $status);
+        self::assertSame([], $runner->calls);
+        self::assertSame(0, $migration->calls);
+        self::assertFileDoesNotExist($this->projectDir.'/src/Entity/User.php');
     }
 
     public function testPartiallyPreinstalledImportmapRequiresOnlyMissingPackage(): void

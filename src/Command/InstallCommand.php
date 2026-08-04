@@ -411,22 +411,45 @@ final class InstallCommand extends Command
             if (!is_string($relativePath)) {
                 throw InstallerExecutionFailed::failed();
             }
-            $path = $layout->path($relativePath);
             $entry = $this->phpArrayEntry($contents, $requirement);
+            if (null === $entry) {
+                if ($this->phpArrayHasKey($contents, $requirement)) {
+                    throw InstallerExecutionFailed::failed();
+                }
+                $missing[] = $requirement;
+
+                continue;
+            }
+
+            if (array_key_exists('path', $entry)) {
+                try {
+                    $localPath = $layout->path($layout->normalizeRelativePath($entry['path']));
+                } catch (InstallerConflict) {
+                    throw InstallerExecutionFailed::failed();
+                }
+                if (!is_file($localPath) || is_link($localPath)) {
+                    throw InstallerExecutionFailed::failed();
+                }
+
+                continue;
+            }
+
+            if (!isset($entry['version']) && !isset($entry['type'])) {
+                throw InstallerExecutionFailed::failed();
+            }
+
+            $path = $layout->path($relativePath);
+            if (is_link($path)) {
+                throw InstallerExecutionFailed::failed();
+            }
             $registered = is_string($registry) ? $this->phpArrayEntry($registry, $requirement) : null;
-            $localPaths = [$relativePath, './'.$relativePath];
-            $isLocal = null !== $entry && in_array($entry['path'] ?? null, $localPaths, true);
-            $isRemote = null !== $entry
-                && isset($entry['version'])
+            $isRemote = isset($entry['version'])
                 && '' !== $entry['version']
                 && 'css' === ($entry['type'] ?? null)
                 && null !== $registered
                 && isset($registered['version'])
                 && '' !== $registered['version'];
-            if ((!$isLocal && !$isRemote)
-                || !is_file($path)
-                || is_link($path)
-            ) {
+            if (!$isRemote || !is_file($path)) {
                 $missing[] = $requirement;
             }
         }
@@ -501,6 +524,29 @@ final class InstallCommand extends Command
         return null;
     }
 
+    private function phpArrayHasKey(string $contents, string $key): bool
+    {
+        try {
+            $tokens = array_values(\PhpToken::tokenize($contents, TOKEN_PARSE));
+        } catch (\Throwable) {
+            throw InstallerExecutionFailed::failed();
+        }
+
+        for ($index = 0, $count = count($tokens); $index < $count; ++$index) {
+            if (T_CONSTANT_ENCAPSED_STRING !== $tokens[$index]->id
+                || $key !== $this->phpStringLiteral($tokens[$index]->text)
+            ) {
+                continue;
+            }
+            $arrow = $this->nextPhpToken($tokens, $index + 1);
+            if (null !== $arrow && T_DOUBLE_ARROW === $tokens[$arrow]->id) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /** @param list<\PhpToken> $tokens */
     private function nextPhpToken(array $tokens, int $offset): ?int
     {
@@ -519,9 +565,13 @@ final class InstallCommand extends Command
             return null;
         }
         $value = substr($literal, 1, -1);
-        $value = "'" === $literal[0]
-            ? str_replace(['\\\\', "\\'"], ['\\', "'"], $value)
-            : stripcslashes($value);
+        if ("'" === $literal[0]) {
+            $value = str_replace(['\\\\', "\\'"], ['\\', "'"], $value);
+        } elseif (1 === preg_match('/\\\\(?![\\\\"])/', $value)) {
+            return null;
+        } else {
+            $value = strtr($value, ['\\\\' => '\\', '\\"' => '"']);
+        }
 
         return str_contains($value, "\0") ? null : $value;
     }
