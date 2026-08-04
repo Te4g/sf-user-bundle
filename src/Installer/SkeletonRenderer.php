@@ -90,6 +90,12 @@ final readonly class SkeletonRenderer
     ) {
     }
 
+    /** @return list<string> */
+    public static function targetPaths(): array
+    {
+        return array_values(self::TEMPLATES);
+    }
+
     /** @return array<string, string> */
     public function renderAll(ProjectLayout $layout): array
     {
