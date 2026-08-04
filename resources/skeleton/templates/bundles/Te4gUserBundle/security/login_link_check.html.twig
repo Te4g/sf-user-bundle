@@ -7,7 +7,7 @@
 <div class="sr-only" aria-live="polite">{{ 'login_link.status'|trans }}</div>
 <form method="post" action="{{ path('te4g_user_login_link_check') }}" class="space-y-4">
 {% for name, value in login_link_parameters %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
-<input type="hidden" name="_csrf_token" value="{{ csrf_token('login_link_check') }}">
+<input type="hidden" name="_csrf_token" value="{{ csrf_token('te4g_user_login_link_check') }}">
 <twig:Button type="submit" class="w-full" data-turbo-submits-with="{{ 'form.submitting'|trans }}"><twig:ux:icon name="lucide:key-round" />{{ 'login_link.submit'|trans }}</twig:Button>
 </form></twig:Card:Content></twig:Card></main>
 {% endblock %}

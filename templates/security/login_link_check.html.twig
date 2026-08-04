@@ -10,7 +10,7 @@
         {% for name, value in login_link_parameters %}
             <input type="hidden" name="{{ name }}" value="{{ value }}">
         {% endfor %}
-        <input type="hidden" name="_csrf_token" value="{{ csrf_token('login_link_check') }}">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('te4g_user_login_link_check') }}">
         <button type="submit">{{ 'login_link.submit'|trans }}</button>
     </form>
 </main>

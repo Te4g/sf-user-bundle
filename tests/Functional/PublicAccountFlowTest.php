@@ -161,7 +161,32 @@ final class PublicAccountFlowTest extends BundleWebTestCase
         self::assertSame($user->getEmail(), $signedParameters['user']);
         self::assertCount(0, $crawler->filter('input[name="evil"]'));
 
-        $client->submit($crawler->selectButton('Continue')->form());
+        $form = $crawler->selectButton('Continue')->form();
+        $formValues = $form->getPhpValues();
+        self::assertArrayHasKey('_csrf_token', $formValues);
+        self::assertIsString($formValues['_csrf_token']);
+        $csrfToken = $formValues['_csrf_token'];
+
+        $client->request('POST', '/login-link/check', $signedParameters);
+        self::assertSame(403, $client->getResponse()->getStatusCode());
+        self::assertNull($this->authenticatedUser());
+
+        $client->request(
+            'POST',
+            '/login-link/check?_csrf_token='.rawurlencode($csrfToken),
+            $signedParameters,
+        );
+        self::assertSame(403, $client->getResponse()->getStatusCode());
+        self::assertNull($this->authenticatedUser());
+
+        $client->request('POST', '/login-link/check', [
+            ...$signedParameters,
+            '_csrf_token' => 'invalid-magic-link-csrf',
+        ]);
+        self::assertSame(403, $client->getResponse()->getStatusCode());
+        self::assertNull($this->authenticatedUser());
+
+        $client->submit($form);
         self::assertSame('http://localhost/check-email', $client->getResponse()->headers->get('Location'));
         $client->followRedirect();
         $authenticatedUser = $this->authenticatedUser();
