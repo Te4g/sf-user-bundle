@@ -1,8 +1,7 @@
+{% extends 'bundles/Te4gUserBundle/layout.html.twig' %}
 {% trans_default_domain 'Te4gUserBundle' %}
-<!doctype html>
-<html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{{ 'registration.title'|trans }}</title></head>
-<body class="min-h-screen bg-background text-foreground">
+{% block title %}{{ 'registration.title'|trans }}{% endblock %}
+{% block body %}
 <main class="mx-auto flex min-h-screen w-full max-w-md items-center px-4 py-12">
     <twig:Card class="w-full shadow-sm">
         <twig:Card:Header>
@@ -16,13 +15,13 @@
             {% endif %}
             {{ form_start(form, {attr: {class: 'space-y-5'}}) }}
                 <twig:Field>
-                    <twig:Field:Label>{{ form_label(form.email) }}</twig:Field:Label>
+                    <twig:Field:Label for="{{ form.email.vars.id }}" class="{{ form.email.vars.required ? 'required' : '' }}">{{ form.email.vars.label|trans(form.email.vars.label_translation_parameters, form.email.vars.translation_domain) }}</twig:Field:Label>
                     {{ form_widget(form.email, {attr: {'aria-describedby': 'registration-email-help registration_email_errors'}}) }}
                     <twig:Field:Description id="registration-email-help">{{ 'registration.status'|trans }}</twig:Field:Description>
                     {{ form_errors(form.email) }}
                 </twig:Field>
                 <twig:Field data-controller="password-visibility" data-password-visibility-show-label-value="{{ 'password.show'|trans }}" data-password-visibility-hide-label-value="{{ 'password.hide'|trans }}">
-                    <twig:Field:Label>{{ form_label(form.plainPassword.first) }}</twig:Field:Label>
+                    <twig:Field:Label for="{{ form.plainPassword.first.vars.id }}" class="{{ form.plainPassword.first.vars.required ? 'required' : '' }}">{{ form.plainPassword.first.vars.label|trans(form.plainPassword.first.vars.label_translation_parameters, form.plainPassword.first.vars.translation_domain) }}</twig:Field:Label>
                     <div class="relative">
                         {{ form_widget(form.plainPassword.first, {attr: {'aria-describedby': 'registration_plainPassword_first_errors', 'data-password-visibility-target': 'input', class: 'pr-28'}}) }}
                         <twig:Button type="button" variant="ghost" size="sm" class="absolute right-1 top-1" aria-pressed="false" data-password-visibility-target="button" data-action="click->password-visibility#toggle"><twig:ux:icon name="lucide:eye" /><span data-password-visibility-target="label">{{ 'password.show'|trans }}</span></twig:Button>
@@ -30,7 +29,7 @@
                     {{ form_errors(form.plainPassword.first) }}
                 </twig:Field>
                 <twig:Field>
-                    <twig:Field:Label>{{ form_label(form.plainPassword.second) }}</twig:Field:Label>
+                    <twig:Field:Label for="{{ form.plainPassword.second.vars.id }}" class="{{ form.plainPassword.second.vars.required ? 'required' : '' }}">{{ form.plainPassword.second.vars.label|trans(form.plainPassword.second.vars.label_translation_parameters, form.plainPassword.second.vars.translation_domain) }}</twig:Field:Label>
                     {{ form_widget(form.plainPassword.second, {attr: {'aria-describedby': 'registration_plainPassword_errors registration_plainPassword_second_errors'}}) }}
                     {{ form_errors(form.plainPassword) }}{{ form_errors(form.plainPassword.second) }}
                 </twig:Field>
@@ -40,5 +39,4 @@
         </twig:Card:Content>
     </twig:Card>
 </main>
-</body>
-</html>
+{% endblock %}

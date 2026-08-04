@@ -1,9 +1,12 @@
+{% extends 'bundles/Te4gUserBundle/layout.html.twig' %}
 {% trans_default_domain 'Te4gUserBundle' %}
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{{ 'check_email.title'|trans }}</title></head>
-<body class="min-h-screen bg-background text-foreground"><main class="mx-auto flex min-h-screen w-full max-w-md items-center px-4 py-12"><twig:Card class="w-full shadow-sm">
+{% block title %}{{ 'check_email.title'|trans }}{% endblock %}
+{% block body %}
+<main class="mx-auto flex min-h-screen w-full max-w-md items-center px-4 py-12"><twig:Card class="w-full shadow-sm">
 <twig:Card:Header><twig:Card:Title><h1 class="text-xl">{{ 'check_email.title'|trans }}</h1></twig:Card:Title><twig:Card:Description>{{ 'check_email.status'|trans }}</twig:Card:Description></twig:Card:Header>
 <twig:Card:Content class="space-y-5"><div aria-live="polite"><twig:Alert><twig:ux:icon name="lucide:circle-check" /><twig:Alert:Description>{{ 'check_email.status'|trans }}</twig:Alert:Description></twig:Alert></div>
 {{ form_start(resend_form, {attr: {class: 'space-y-4'}}) }}{% if resend_form.vars.submitted and not resend_form.vars.valid %}<twig:Alert variant="destructive"><twig:Alert:Title>{{ 'form.error_summary'|trans }}</twig:Alert:Title><twig:Alert:Description>{{ form_errors(resend_form) }}</twig:Alert:Description></twig:Alert>{% endif %}
-<twig:Field><twig:Field:Label>{{ form_label(resend_form.email) }}</twig:Field:Label>{{ form_widget(resend_form.email, {attr: {'aria-describedby': 'email_email_errors'}}) }}{{ form_errors(resend_form.email) }}</twig:Field>
+<twig:Field><twig:Field:Label for="{{ resend_form.email.vars.id }}" class="{{ resend_form.email.vars.required ? 'required' : '' }}">{{ resend_form.email.vars.label|trans(resend_form.email.vars.label_translation_parameters, resend_form.email.vars.translation_domain) }}</twig:Field:Label>{{ form_widget(resend_form.email, {attr: {'aria-describedby': 'email_email_errors'}}) }}{{ form_errors(resend_form.email) }}</twig:Field>
 {{ form_rest(resend_form) }}<twig:Button type="submit" variant="outline" class="w-full" data-turbo-submits-with="{{ 'form.submitting'|trans }}">{{ 'check_email.resend'|trans }}</twig:Button>{{ form_end(resend_form, {render_rest: false}) }}
-</twig:Card:Content></twig:Card></main></body></html>
+</twig:Card:Content></twig:Card></main>
+{% endblock %}
