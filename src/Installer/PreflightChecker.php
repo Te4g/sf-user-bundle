@@ -621,6 +621,10 @@ final readonly class PreflightChecker
             if ($this->isManifestOwned($manifest, $relativePath, $path)) {
                 continue;
             }
+            $contents = is_file($path) && !is_link($path) ? file_get_contents($path) : false;
+            if (is_string($contents) && FlexBootstrap::matches($manifest, $relativePath, $contents)) {
+                continue;
+            }
 
             $code = str_starts_with($relativePath, 'templates/components/')
                 ? 'existing-component'
