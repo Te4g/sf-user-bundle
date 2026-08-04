@@ -44,6 +44,11 @@ final class InstallerConflict extends \RuntimeException
         return new self('Installer conflict.', $code, $relativePath);
     }
 
+    public static function forPathless(string $code): self
+    {
+        return new self('Installer conflict.', $code);
+    }
+
     public function code(): string
     {
         return $this->conflictCode;
