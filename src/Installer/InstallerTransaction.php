@@ -33,12 +33,18 @@ final class InstallerTransaction
     private bool $closed = false;
 
     private readonly InstallerFilesystem $filesystem;
+    private readonly FilesystemIdentity $projectRootIdentity;
 
     public function __construct(
         private readonly ProjectLayout $layout,
         ?InstallerFilesystem $filesystem = null,
     ) {
         $this->filesystem = $filesystem ?? new InstallerFilesystem();
+        $projectRootIdentity = $this->filesystem->identity($layout->projectDir());
+        if (null === $projectRootIdentity || !$projectRootIdentity->isDirectory()) {
+            throw InstallerExecutionFailed::failed();
+        }
+        $this->projectRootIdentity = $projectRootIdentity;
         [$this->expectedFiles, $this->expectedDirectories] = $this->inventory();
     }
 
@@ -109,11 +115,18 @@ final class InstallerTransaction
         );
 
         foreach ($allowedChanges as $relativePath) {
+            [$parentRelativePath, $parentIdentity] = $this->parentSnapshot(
+                $relativePath,
+                $this->expectedDirectories,
+                $afterDirectories,
+            );
             $this->recordChange(
                 $relativePath,
                 $this->expectedFiles[$relativePath] ?? null,
                 $originalContents[$relativePath] ?? null,
                 $afterFiles[$relativePath] ?? null,
+                $parentRelativePath,
+                $parentIdentity,
             );
         }
 
@@ -286,8 +299,11 @@ final class InstallerTransaction
         ?ApplicationFileState $before,
         ?string $originalContents,
         ?ApplicationFileState $after,
+        ?string $parentRelativePath,
+        FilesystemIdentity $parentIdentity,
     ): void {
         if (isset($this->snapshots[$relativePath])) {
+            $this->assertExternalParentOwned($this->snapshots[$relativePath]);
             $this->snapshots[$relativePath]->updateWrittenState($after);
 
             return;
@@ -301,6 +317,8 @@ final class InstallerTransaction
             $relativePath,
             $before,
             $originalContents,
+            $parentRelativePath,
+            $parentIdentity,
             $after,
         );
         $this->snapshotOrder[] = $relativePath;
@@ -316,7 +334,7 @@ final class InstallerTransaction
         foreach ($allowedChanges as $relativePath) {
             $parent = dirname($relativePath);
             while ('.' !== $parent && '' !== $parent) {
-                if (!isset($before[$parent], $this->createdDirectories[$parent]) && isset($after[$parent])) {
+                if (!isset($before[$parent]) && !isset($this->createdDirectories[$parent]) && isset($after[$parent])) {
                     $this->createdDirectories[$parent] = $after[$parent];
                 }
                 $parent = dirname($parent);
@@ -362,18 +380,13 @@ final class InstallerTransaction
     private function rollbackExternalFile(ExternalFileSnapshot $snapshot): void
     {
         $relativePath = $snapshot->relativePath();
-        $current = $this->captureState($relativePath);
-        $written = $snapshot->writtenState();
-        if ((null === $written && null !== $current)
-            || (null !== $written && !$written->equals($current))
-        ) {
-            throw InstallerConflict::forPath($relativePath, 'external-rollback-target-changed');
-        }
+        $current = $this->assertExternalOwnership($snapshot);
 
         $target = $this->layout->path($relativePath);
         $original = $snapshot->originalState();
         if (null === $original) {
             if (null !== $current) {
+                $this->assertExternalOwnership($snapshot);
                 $this->filesystem->remove($target);
             }
 
@@ -386,6 +399,7 @@ final class InstallerTransaction
         $temporary = $this->layout->path('var/te4g-user-installer/restore-'.bin2hex(random_bytes(16)));
         try {
             $this->filesystem->writeExclusive($temporary, $snapshot->originalContents(), $original->mode());
+            $this->assertExternalOwnership($snapshot);
             $this->filesystem->rename($temporary, $target);
         } catch (\Throwable) {
             try {
@@ -433,13 +447,57 @@ final class InstallerTransaction
     }
 
     /**
+     * @param array<string, FilesystemIdentity> $beforeDirectories
+     * @param array<string, FilesystemIdentity> $afterDirectories
+     *
+     * @return array{?string, FilesystemIdentity}
+     */
+    private function parentSnapshot(string $relativePath, array $beforeDirectories, array $afterDirectories): array
+    {
+        $parentRelativePath = dirname($relativePath);
+        if ('.' === $parentRelativePath || '' === $parentRelativePath) {
+            return [null, $this->projectRootIdentity];
+        }
+        $identity = $beforeDirectories[$parentRelativePath] ?? $afterDirectories[$parentRelativePath] ?? null;
+        if (!$identity instanceof FilesystemIdentity || !$identity->isDirectory()) {
+            throw InstallerExecutionFailed::failed();
+        }
+
+        return [$parentRelativePath, $identity];
+    }
+
+    private function assertExternalParentOwned(ExternalFileSnapshot $snapshot): void
+    {
+        $parent = null === $snapshot->parentRelativePath()
+            ? $this->layout->projectDir()
+            : $this->layout->path($snapshot->parentRelativePath());
+        if (!$snapshot->parentIdentity()->equals($this->filesystem->identity($parent))) {
+            throw InstallerConflict::forPath($snapshot->relativePath(), 'external-rollback-parent-changed');
+        }
+    }
+
+    private function assertExternalOwnership(ExternalFileSnapshot $snapshot): ?ApplicationFileState
+    {
+        $this->assertExternalParentOwned($snapshot);
+        $current = $this->captureState($snapshot->relativePath());
+        $written = $snapshot->writtenState();
+        if ((null === $written && null !== $current)
+            || (null !== $written && !$written->equals($current))
+        ) {
+            throw InstallerConflict::forPath($snapshot->relativePath(), 'external-rollback-target-changed');
+        }
+
+        return $current;
+    }
+
+    /**
      * @return array{array<string, ApplicationFileState>, array<string, FilesystemIdentity>}
      */
     private function inventory(): array
     {
         $files = [];
         $directories = [];
-        foreach (['assets', 'bin', 'config', 'migrations', 'public', 'src', 'templates', 'translations'] as $root) {
+        foreach (['assets', 'bin', 'config', 'migrations', 'public', 'src', 'templates', 'translations', 'var/tailwind'] as $root) {
             $path = $this->layout->path($root);
             if (!file_exists($path)) {
                 continue;

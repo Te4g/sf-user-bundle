@@ -125,6 +125,7 @@ final readonly class PreflightChecker
 
         $manifest = $this->loadManifest($layout, $add);
         $this->checkBundles($layout, $add);
+        $this->checkAssetMapperPaths($layout, $add);
         $this->checkFirewall($layout, $add);
         $this->checkRoutes($layout, $add);
         $this->checkGeneratedTargets($layout, $manifest, $add);
@@ -245,6 +246,87 @@ final readonly class PreflightChecker
         }
     }
 
+    /** @param callable(InstallerConflict): void $add */
+    private function checkAssetMapperPaths(ProjectLayout $layout, callable $add): void
+    {
+        try {
+            $directory = $layout->path('config/packages');
+        } catch (InstallerConflict) {
+            return;
+        }
+        if (!is_dir($directory) || is_link($directory)) {
+            return;
+        }
+
+        $files = [];
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS),
+        );
+        foreach ($iterator as $info) {
+            if (!$info->isFile() || $info->isLink() || !preg_match('/\.ya?ml$/i', $info->getFilename())) {
+                continue;
+            }
+            $files[] = $info->getPathname();
+        }
+        sort($files, SORT_STRING);
+        foreach ($files as $path) {
+            $relativePath = str_replace(
+                DIRECTORY_SEPARATOR,
+                '/',
+                substr($path, strlen($layout->projectDir()) + 1),
+            );
+            try {
+                $config = Yaml::parseFile($path);
+            } catch (\Throwable) {
+                continue;
+            }
+            if (is_array($config)) {
+                $this->checkAssetMapperNode($config, $layout, $relativePath, $add);
+            }
+        }
+    }
+
+    /**
+     * @param array<int|string, mixed>          $config
+     * @param callable(InstallerConflict): void $add
+     */
+    private function checkAssetMapperNode(array $config, ProjectLayout $layout, string $relativePath, callable $add): void
+    {
+        foreach ($config as $key => $value) {
+            if (is_string($key) && str_starts_with($key, 'when@') && is_array($value)) {
+                $this->checkAssetMapperNode($value, $layout, $relativePath, $add);
+            }
+        }
+
+        $framework = $config['framework'] ?? null;
+        if (!is_array($framework) || !array_key_exists('asset_mapper', $framework)) {
+            return;
+        }
+        $assetMapper = $framework['asset_mapper'];
+        if (!is_array($assetMapper)) {
+            if (false === $assetMapper) {
+                $add(InstallerConflict::forPath($relativePath, 'asset-mapper-importmap-path-conflict'));
+                $add(InstallerConflict::forPath($relativePath, 'asset-mapper-vendor-dir-conflict'));
+            }
+
+            return;
+        }
+
+        foreach ([
+            'importmap_path' => ['%kernel.project_dir%/importmap.php', $layout->projectDir().'/importmap.php'],
+            'vendor_dir' => ['%kernel.project_dir%/assets/vendor', $layout->projectDir().'/assets/vendor'],
+        ] as $key => $allowed) {
+            if (array_key_exists($key, $assetMapper)
+                && (!is_string($assetMapper[$key]) || !in_array($assetMapper[$key], $allowed, true))
+            ) {
+                $add(InstallerConflict::forPath(
+                    $relativePath,
+                    'asset-mapper-'.str_replace('_', '-', $key).'-conflict',
+                ));
+            }
+        }
+    }
+
     /** @return list<string> */
     private function phpClassConstants(string $contents): array
     {
@@ -321,9 +403,12 @@ final readonly class PreflightChecker
         }
 
         $firewalls = $config['security']['firewalls'] ?? null;
-        $main = is_array($firewalls) && isset($firewalls['main']) && is_array($firewalls['main'])
-            ? $firewalls['main']
-            : [];
+        if (!is_array($firewalls) || !array_key_exists('main', $firewalls) || !is_array($firewalls['main'])) {
+            $add(InstallerConflict::forPath($relativePath, 'main-firewall-missing'));
+
+            return;
+        }
+        $main = $firewalls['main'];
         $provider = $main['provider'] ?? null;
         if (null !== $provider && 'te4g_user_provider' !== $provider) {
             $add(InstallerConflict::forPath($relativePath, 'main-firewall-provider-conflict'));
@@ -365,97 +450,8 @@ final readonly class PreflightChecker
     /** @param callable(InstallerConflict): void $add */
     private function checkRoutes(ProjectLayout $layout, callable $add): void
     {
-        try {
-            $directory = $layout->path('config/routes');
-        } catch (InstallerConflict) {
-            return;
-        }
-        if (!is_dir($directory)) {
-            return;
-        }
-
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS | \FilesystemIterator::CURRENT_AS_FILEINFO),
-        );
-        foreach ($iterator as $info) {
-            if (!$info->isFile() || $info->isLink()) {
-                continue;
-            }
-
-            $absolutePath = $info->getPathname();
-            $relativePath = str_replace(DIRECTORY_SEPARATOR, '/', substr($absolutePath, strlen($layout->projectDir()) + 1));
-            if ('config/routes/te4g_user.yaml' === $relativePath) {
-                continue;
-            }
-
-            $names = [];
-            if (preg_match('/\.ya?ml$/', $relativePath)) {
-                try {
-                    $routes = Yaml::parseFile($absolutePath);
-                } catch (\Throwable) {
-                    $add(InstallerConflict::forPath($relativePath, 'invalid-route-configuration'));
-
-                    continue;
-                }
-                if (is_array($routes)) {
-                    $names = array_filter(array_keys($routes), 'is_string');
-                }
-            } elseif (str_ends_with($relativePath, '.php')) {
-                $contents = file_get_contents($absolutePath);
-                if (is_string($contents) && preg_match_all('/->add\(\s*[\'\"]([^\'\"]+)[\'\"]/', $contents, $matches)) {
-                    $names = $matches[1];
-                }
-            }
-
-            foreach (array_intersect(self::ROUTE_NAMES, $names) as $name) {
-                $add(InstallerConflict::forPath($relativePath, 'route-name-'.str_replace('_', '-', $name).'-conflict'));
-            }
-        }
-
-        $this->checkControllerRouteAttributes($layout, $add);
-    }
-
-    /** @param callable(InstallerConflict): void $add */
-    private function checkControllerRouteAttributes(ProjectLayout $layout, callable $add): void
-    {
-        try {
-            $directory = $layout->path('src/Controller');
-        } catch (InstallerConflict) {
-            return;
-        }
-        if (!is_dir($directory)) {
-            return;
-        }
-
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS | \FilesystemIterator::CURRENT_AS_FILEINFO),
-        );
-        foreach ($iterator as $info) {
-            if (!$info->isFile() || $info->isLink() || 'php' !== strtolower($info->getExtension())) {
-                continue;
-            }
-            $contents = file_get_contents($info->getPathname());
-            if (!is_string($contents)) {
-                continue;
-            }
-
-            $names = [];
-            if (preg_match_all('/#\[\s*(?:[\\\\A-Za-z_][\\\\A-Za-z0-9_]*\\\\)?Route\s*\((.*?)\)\s*\]/s', $contents, $attributes)) {
-                foreach ($attributes[1] as $arguments) {
-                    if (preg_match('/\bname\s*:\s*[\'\"]([^\'\"]+)[\'\"]/', $arguments, $match)) {
-                        $names[] = $match[1];
-                    }
-                }
-            }
-
-            $relativePath = str_replace(
-                DIRECTORY_SEPARATOR,
-                '/',
-                substr($info->getPathname(), strlen($layout->projectDir()) + 1),
-            );
-            foreach (array_intersect(self::ROUTE_NAMES, $names) as $name) {
-                $add(InstallerConflict::forPath($relativePath, 'route-name-'.str_replace('_', '-', $name).'-conflict'));
-            }
+        foreach ((new RouteConflictScanner())->scan($layout, self::ROUTE_NAMES) as $conflict) {
+            $add($conflict);
         }
     }
 

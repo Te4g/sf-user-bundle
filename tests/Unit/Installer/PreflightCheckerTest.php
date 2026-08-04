@@ -171,6 +171,403 @@ final class PreflightCheckerTest extends TestCase
         self::assertContains('config/packages/security.yaml|main-firewall-authenticator-conflict', $keys);
     }
 
+    public function testMissingMainFirewallIsAConflict(): void
+    {
+        file_put_contents($this->projectDir.'/config/packages/security.yaml', <<<'YAML'
+            security:
+                firewalls:
+                    dev:
+                        pattern: ^/_
+                        security: false
+            YAML);
+
+        $conflicts = $this->checker()->check(ProjectLayout::at($this->projectDir));
+
+        self::assertContains(
+            'config/packages/security.yaml|main-firewall-missing',
+            $this->conflictKeys($conflicts),
+        );
+    }
+
+    public function testCustomAssetMapperStoragePathsAreRejectedBeforeExactPathTracking(): void
+    {
+        $this->write('config/packages/framework.yaml', <<<'YAML'
+            framework:
+                asset_mapper:
+                    importmap_path: '%kernel.project_dir%/config/application-importmap.php'
+                    vendor_dir: '%kernel.project_dir%/var/application-vendor'
+            YAML);
+
+        $keys = $this->conflictKeys($this->checker()->check(ProjectLayout::at($this->projectDir)));
+
+        self::assertContains('config/packages/framework.yaml|asset-mapper-importmap-path-conflict', $keys);
+        self::assertContains('config/packages/framework.yaml|asset-mapper-vendor-dir-conflict', $keys);
+    }
+
+    public function testRootRouteFilesAndNestedYamlNamePrefixesAreScanned(): void
+    {
+        $this->write('config/routes.yaml', <<<'YAML'
+            te4g_user_login:
+                path: /application-login
+            YAML);
+        $this->write('config/routes.yml', <<<'YAML'
+            prefixed_account_routes:
+                resource: routes/imported.yaml
+                name_prefix: te4g_user_
+            te4g_user_logout:
+                resource: '@FrameworkBundle/Resources/config/routing/errors.xml'
+            YAML);
+        $this->write('config/routes/imported.yaml', <<<'YAML'
+            profile:
+                path: /application-profile
+            YAML);
+
+        $keys = $this->conflictKeys($this->checker()->check(ProjectLayout::at($this->projectDir)));
+
+        self::assertContains('config/routes.yaml|route-name-te4g-user-login-conflict', $keys);
+        self::assertContains('config/routes/imported.yaml|route-name-te4g-user-profile-conflict', $keys);
+        self::assertNotContains('config/routes.yml|route-name-te4g-user-logout-conflict', $keys);
+        self::assertSame($this->sorted($keys), $keys);
+    }
+
+    public function testRouteAttributesSupportPositionalNamesAndClassPrefixes(): void
+    {
+        $this->write('src/Controller/PositionalController.php', <<<'PHP'
+            <?php
+
+            namespace App\Controller;
+
+            use Symfony\Component\Routing\Attribute\Route;
+
+            final class PositionalController
+            {
+                #[Route('/mine', 'te4g_user_login')]
+                public function login(): void
+                {
+                }
+            }
+            PHP);
+        $this->write('src/Controller/PrefixedController.php', <<<'PHP'
+            <?php
+
+            namespace App\Controller;
+
+            use Symfony\Component\Routing\Attribute\Route as RoutingRoute;
+
+            #[RoutingRoute(name: 'te4g_user_')]
+            final class PrefixedController
+            {
+                #[RoutingRoute(path: '/mine', name: 'profile')]
+                public function profile(): void
+                {
+                }
+            }
+            PHP);
+
+        $keys = $this->conflictKeys($this->checker()->check(ProjectLayout::at($this->projectDir)));
+
+        self::assertContains('src/Controller/PositionalController.php|route-name-te4g-user-login-conflict', $keys);
+        self::assertContains('src/Controller/PrefixedController.php|route-name-te4g-user-profile-conflict', $keys);
+    }
+
+    public function testAttributeImportPrefixComposesWithClassAndMethodNames(): void
+    {
+        $this->write('config/routes.yaml', <<<'YAML'
+            prefixed_controllers:
+                resource: ../src/Controller/ImportedController.php
+                type: attribute
+                name_prefix: te4g_
+            YAML);
+        $this->write('src/Controller/ImportedController.php', <<<'PHP'
+            <?php
+
+            namespace App\Controller;
+
+            #[\Symfony\Component\Routing\Attribute\Route(name: 'user_')]
+            final class ImportedController
+            {
+                #[\Symfony\Component\Routing\Attribute\Route('/mine', name: 'login')]
+                public function login(): void
+                {
+                }
+            }
+            PHP);
+
+        $keys = $this->conflictKeys($this->checker()->check(ProjectLayout::at($this->projectDir)));
+
+        self::assertContains('src/Controller/ImportedController.php|route-name-te4g-user-login-conflict', $keys);
+    }
+
+    public function testPhpRouteConfigurationSupportsLiteralRoutesAndAttributeImports(): void
+    {
+        $this->write('config/routes.php', <<<'PHP'
+            <?php
+
+            use Symfony\Component\Routing\Loader\Configurator\RoutingConfigurator;
+
+            return static function (RoutingConfigurator $routes): void {
+                $routes->add('te4g_user_account', '/account');
+                $routes->alias(name: 'te4g_user_profile', alias: 'application_profile');
+                $routes->import('../src/Routing/', 'attribute')->namePrefix('te4g_');
+            };
+            PHP);
+        $this->write('src/Routing/ImportedController.php', <<<'PHP'
+            <?php
+
+            namespace App\Routing;
+
+            use Symfony\Component\Routing\Attribute\Route;
+
+            #[Route(name: 'user_')]
+            final class ImportedController
+            {
+                #[Route('/login', name: 'login')]
+                public function login(): void
+                {
+                }
+            }
+            PHP);
+
+        $keys = $this->conflictKeys($this->checker()->check(ProjectLayout::at($this->projectDir)));
+
+        self::assertContains('config/routes.php|route-name-te4g-user-account-conflict', $keys);
+        self::assertContains('config/routes.php|route-name-te4g-user-profile-conflict', $keys);
+        self::assertContains('src/Routing/ImportedController.php|route-name-te4g-user-login-conflict', $keys);
+    }
+
+    public function testPhpRoutesConfigLiteralArrayIsScannedWithoutExecution(): void
+    {
+        $this->write('config/routes.php', <<<'PHP'
+            <?php
+
+            namespace Symfony\Component\Routing\Loader\Configurator;
+
+            file_put_contents(__DIR__.'/route-parser-executed', 'must not execute');
+
+            return Routes::config([
+                'te4g_user_logout' => [
+                    'path' => '/application-logout',
+                    'controller' => App\Controller\LogoutController::class,
+                ],
+            ]);
+            PHP);
+
+        $keys = $this->conflictKeys($this->checker()->check(ProjectLayout::at($this->projectDir)));
+
+        self::assertContains('config/routes.php|route-name-te4g-user-logout-conflict', $keys);
+        self::assertFileDoesNotExist($this->projectDir.'/config/route-parser-executed');
+    }
+
+    public function testBarePhpRouteArraysAndAliasedRoutesHelpersAreScannedWhileDynamicReturnsFailClosed(): void
+    {
+        $this->write('config/routes/bare.php', <<<'PHP'
+            <?php
+
+            return [
+                'te4g_user_login' => ['path' => '/application-login'],
+            ];
+            PHP);
+        $this->write('config/routes/aliased.php', <<<'PHP'
+            <?php
+
+            use Symfony\Component\Routing\Loader\Configurator\Routes as R;
+
+            return R::config([
+                'te4g_user_profile' => ['path' => '/application-profile'],
+            ]);
+            PHP);
+        $this->write('config/routes/dynamic.php', <<<'PHP'
+            <?php
+
+            return buildApplicationRoutes();
+            PHP);
+
+        $keys = $this->conflictKeys($this->checker()->check(ProjectLayout::at($this->projectDir)));
+
+        self::assertContains('config/routes/bare.php|route-name-te4g-user-login-conflict', $keys);
+        self::assertContains('config/routes/aliased.php|route-name-te4g-user-profile-conflict', $keys);
+        self::assertContains('config/routes/dynamic.php|uninspectable-route-configuration', $keys);
+    }
+
+    public function testAttributeNamespaceAliasesAndRouteAliasesAreScanned(): void
+    {
+        $this->write('src/Controller/AliasedAttributeController.php', <<<'PHP'
+            <?php
+
+            namespace App\Controller;
+
+            use Symfony\Component\Routing\Attribute as Routing;
+
+            final class AliasedAttributeController
+            {
+                #[Routing\Route('/login', name: 'te4g_user_login')]
+                public function login(): void
+                {
+                }
+
+                #[Routing\Route('/safe', name: 'application_safe', alias: 'te4g_user_profile')]
+                public function safe(): void
+                {
+                }
+            }
+            PHP);
+
+        $keys = $this->conflictKeys($this->checker()->check(ProjectLayout::at($this->projectDir)));
+
+        self::assertContains('src/Controller/AliasedAttributeController.php|route-name-te4g-user-login-conflict', $keys);
+        self::assertContains('src/Controller/AliasedAttributeController.php|route-name-te4g-user-profile-conflict', $keys);
+    }
+
+    public function testImportedControllerPrefixesAreAppliedOnceAndClassPrefixesAreNotStandaloneRoutes(): void
+    {
+        $this->write('config/routes.yaml', <<<'YAML'
+            prefixed_controller:
+                resource: ../src/Controller/PrefixedOnlyController.php
+                type: attribute
+                name_prefix: app_
+            YAML);
+        $this->write('src/Controller/PrefixedOnlyController.php', <<<'PHP'
+            <?php
+
+            namespace App\Controller;
+
+            use Symfony\Component\Routing\Attribute\Route;
+
+            final class PrefixedOnlyController
+            {
+                #[Route('/login', name: 'te4g_user_login')]
+                public function login(): void
+                {
+                }
+            }
+            PHP);
+        $this->write('src/Controller/ClassPrefixController.php', <<<'PHP'
+            <?php
+
+            namespace App\Controller;
+
+            use Symfony\Component\Routing\Attribute\Route;
+
+            #[Route(name: 'te4g_user_login')]
+            final class ClassPrefixController
+            {
+                #[Route('/index')]
+                public function index(): void
+                {
+                }
+            }
+            PHP);
+
+        $keys = $this->conflictKeys($this->checker()->check(ProjectLayout::at($this->projectDir)));
+
+        self::assertNotContains('src/Controller/PrefixedOnlyController.php|route-name-te4g-user-login-conflict', $keys);
+        self::assertNotContains('src/Controller/ClassPrefixController.php|route-name-te4g-user-login-conflict', $keys);
+    }
+
+    public function testUntypedSourceDirectoryResourcesAreScannedAsAttributeControllers(): void
+    {
+        $this->write('config/routes.yaml', <<<'YAML'
+            application_routing:
+                resource: ../src/Routing/
+            YAML);
+        $this->write('src/Routing/ApplicationController.php', <<<'PHP'
+            <?php
+
+            namespace App\Routing;
+
+            use Symfony\Component\Routing\Attribute\Route;
+
+            final class ApplicationController
+            {
+                #[Route('/account', name: 'te4g_user_account')]
+                public function account(): void
+                {
+                }
+            }
+            PHP);
+
+        $keys = $this->conflictKeys($this->checker()->check(ProjectLayout::at($this->projectDir)));
+
+        self::assertContains('src/Routing/ApplicationController.php|route-name-te4g-user-account-conflict', $keys);
+    }
+
+    public function testRouteScannerFailsClosedForRootSymlinksAndUnsupportedPhpStringEscapes(): void
+    {
+        $this->write('config/application-routes.yaml', "safe:\n    path: /safe\n");
+        symlink('application-routes.yaml', $this->projectDir.'/config/routes.yaml');
+        $this->write('config/routes/unicode.php', <<<'PHP'
+            <?php
+
+            return static function ($routes): void {
+                $routes->add("te4g_\u{75}ser_login", '/login');
+            };
+            PHP);
+
+        $keys = $this->conflictKeys($this->checker()->check(ProjectLayout::at($this->projectDir)));
+
+        self::assertContains('config/routes.yaml|uninspectable-route-resource', $keys);
+        self::assertContains('config/routes/unicode.php|uninspectable-route-configuration', $keys);
+    }
+
+    public function testUnrelatedPhpCallsAndNestedAttributeNamesDoNotCreateRouteConflicts(): void
+    {
+        $this->write('config/routes.php', <<<'PHP'
+            <?php
+
+            return static function ($routes) use ($logger): void {
+                $logger->add('te4g_user_login');
+                $routes->add('application_safe', '/safe');
+            };
+            PHP);
+        $this->write('src/Controller/MetadataController.php', <<<'PHP'
+            <?php
+
+            namespace App\Controller;
+
+            use App\Attribute\Metadata;
+            use Symfony\Component\Routing\Attribute\Route;
+
+            final class MetadataController
+            {
+                #[Metadata(Route::class)]
+                #[Route]
+                public function safe(): void
+                {
+                }
+            }
+            PHP);
+        $this->write('config/routes/empty.yaml', "# valid empty route collection\n");
+
+        $keys = $this->conflictKeys($this->checker()->check(ProjectLayout::at($this->projectDir)));
+
+        self::assertNotContains('config/routes.php|route-name-te4g-user-login-conflict', $keys);
+        self::assertNotContains('src/Controller/MetadataController.php|uninspectable-route-configuration', $keys);
+        self::assertNotContains('config/routes/empty.yaml|invalid-route-configuration', $keys);
+    }
+
+    public function testUninspectableRouteDefinitionsFailClosedWithoutExecutingThem(): void
+    {
+        $this->write('config/routes.php', <<<'PHP'
+            <?php
+
+            file_put_contents(__DIR__.'/route-parser-executed', 'must not execute');
+            $routes->add(getenv('DYNAMIC_ROUTE_NAME'), '/dynamic');
+            PHP);
+        $this->write('config/routes/broken.yaml', <<<'YAML'
+            imported:
+                resource: '%unknown_route_root%/routes.yaml'
+            YAML);
+        $before = $this->inventory();
+
+        $keys = $this->conflictKeys($this->checker()->check(ProjectLayout::at($this->projectDir)));
+
+        self::assertContains('config/routes.php|uninspectable-route-configuration', $keys);
+        self::assertContains('config/routes/broken.yaml|uninspectable-route-resource', $keys);
+        self::assertFileDoesNotExist($this->projectDir.'/config/route-parser-executed');
+        self::assertSame($before, $this->inventory());
+        self::assertSame($this->sorted($keys), $keys);
+    }
+
     private function checker(string $phpVersion = '8.4.10', string $symfonyVersion = '8.1.2'): PreflightChecker
     {
         return new PreflightChecker(

@@ -44,7 +44,12 @@ final class InstallerFilesystem
 
     public function hash(string $path): string
     {
-        return hash('sha256', $this->read($path));
+        $hash = $this->guarded(static fn (): string|false => hash_file('sha256', $path));
+        if (false === $hash) {
+            throw InstallerWriteFailed::writeFailed();
+        }
+
+        return $hash;
     }
 
     public function createDirectory(string $path, int $mode): void
