@@ -494,6 +494,83 @@ final class InstallCommandTest extends TestCase
         self::assertFileDoesNotExist($this->projectDir.'/src/Entity/User.php');
     }
 
+    public function testDryRunRejectsAnUninspectableRequiredImportmapPathDespiteRemoteMetadata(): void
+    {
+        $this->writeImportmapWithUninspectablePath('shadcn/dist/tailwind.css');
+        $runner = new InstallerCommandProcessRunner($this->projectDir);
+        $migration = new InstallerCommandMigrationGenerator($this->projectDir);
+        $before = $this->inventory();
+        $tester = $this->command($runner, $migration);
+
+        $status = $tester->execute(['--dry-run' => true, '--no-interaction' => true], ['interactive' => false]);
+
+        self::assertSame(Command::FAILURE, $status);
+        self::assertSame($before, $this->inventory());
+        self::assertSame([], $runner->calls);
+        self::assertSame(0, $migration->calls);
+    }
+
+    public function testUninspectableRequiredImportmapPathFailsClosedBeforeWritesOrProcesses(): void
+    {
+        $this->writeImportmapWithUninspectablePath('tw-animate-css/dist/tw-animate.css');
+        $runner = new InstallerCommandProcessRunner($this->projectDir);
+        $migration = new InstallerCommandMigrationGenerator($this->projectDir);
+        $before = $this->inventory();
+        $tester = $this->command($runner, $migration);
+
+        $status = $tester->execute(['--no-interaction' => true], ['interactive' => false]);
+
+        self::assertSame(Command::FAILURE, $status);
+        self::assertSame($before, $this->inventory());
+        self::assertSame([], $runner->calls);
+        self::assertSame(0, $migration->calls);
+        self::assertFileDoesNotExist($this->projectDir.'/src/Entity/User.php');
+    }
+
+    public function testLaterDuplicateUninspectableRequiredImportmapPathFailsClosedBeforeWritesOrProcesses(): void
+    {
+        $this->writeImportmapWithUninspectablePath(
+            'shadcn/dist/tailwind.css',
+            "'path' => './assets/vendor/shadcn/dist/tailwind.css', 'path' => dynamic_path()",
+        );
+        $runner = new InstallerCommandProcessRunner($this->projectDir);
+        $migration = new InstallerCommandMigrationGenerator($this->projectDir);
+        $before = $this->inventory();
+        $tester = $this->command($runner, $migration);
+
+        $status = $tester->execute(['--no-interaction' => true], ['interactive' => false]);
+
+        self::assertSame(Command::FAILURE, $status);
+        self::assertSame($before, $this->inventory());
+        self::assertSame([], $runner->calls);
+        self::assertSame(0, $migration->calls);
+    }
+
+    #[DataProvider('uninspectableImportmapMemberProvider')]
+    public function testUninspectableImportmapMemberCannotHideARequiredPath(string $member): void
+    {
+        $this->writeImportmapWithUninspectablePath('shadcn/dist/tailwind.css', $member);
+        $runner = new InstallerCommandProcessRunner($this->projectDir);
+        $migration = new InstallerCommandMigrationGenerator($this->projectDir);
+        $before = $this->inventory();
+        $tester = $this->command($runner, $migration);
+
+        $status = $tester->execute(['--dry-run' => true, '--no-interaction' => true], ['interactive' => false]);
+
+        self::assertSame(Command::FAILURE, $status);
+        self::assertSame($before, $this->inventory());
+        self::assertSame([], $runner->calls);
+        self::assertSame(0, $migration->calls);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function uninspectableImportmapMemberProvider(): iterable
+    {
+        yield 'dynamic key' => ["dynamic_key() => './assets/vendor/shadcn/dist/tailwind.css'"];
+        yield 'concatenated key' => ["'pa' . 'th' => './assets/vendor/shadcn/dist/tailwind.css'"];
+        yield 'spread' => ['...dynamic_entry()'];
+    }
+
     public function testPartiallyPreinstalledImportmapRequiresOnlyMissingPackage(): void
     {
         $this->write('importmap.php', <<<'PHP'
@@ -1085,6 +1162,39 @@ final class InstallCommandTest extends TestCase
     private function tailwindBinaryPath(): string
     {
         return 'var/tailwind/v4.3.3/'.TailwindBinary::getBinaryName('4.3.3');
+    }
+
+    private function writeImportmapWithUninspectablePath(
+        string $dynamicRequirement,
+        ?string $uninspectableMember = null,
+    ): void {
+        $entries = [
+            'shadcn/dist/tailwind.css' => "['version' => '4.16.1', 'type' => 'css']",
+            'tw-animate-css/dist/tw-animate.css' => "['version' => '1.4.0', 'type' => 'css']",
+        ];
+        $uninspectableMember ??= 'shadcn/dist/tailwind.css' === $dynamicRequirement
+            ? "'path' => dynamic_path()"
+            : "'path' => './assets/vendor/tw-animate-css/dist/tw-animate.css' . dynamic_path()";
+        $entries[$dynamicRequirement] = sprintf(
+            "[%s, 'version' => '%s', 'type' => 'css']",
+            $uninspectableMember,
+            'shadcn/dist/tailwind.css' === $dynamicRequirement ? '4.16.1' : '1.4.0',
+        );
+        $this->write('importmap.php', sprintf(
+            "<?php\n\nreturn [\n    'app' => ['path' => './assets/app.js', 'entrypoint' => true],\n    'shadcn/dist/tailwind.css' => %s,\n    'tw-animate-css/dist/tw-animate.css' => %s,\n];\n",
+            $entries['shadcn/dist/tailwind.css'],
+            $entries['tw-animate-css/dist/tw-animate.css'],
+        ));
+        $this->write('assets/vendor/shadcn/dist/tailwind.css', "remote shadcn\n");
+        $this->write('assets/vendor/tw-animate-css/dist/tw-animate.css', "remote animation\n");
+        $this->write('assets/vendor/installed.php', <<<'PHP'
+            <?php
+
+            return [
+                'shadcn/dist/tailwind.css' => ['version' => '4.16.1', 'dependencies' => [], 'extraFiles' => []],
+                'tw-animate-css/dist/tw-animate.css' => ['version' => '1.4.0', 'dependencies' => [], 'extraFiles' => []],
+            ];
+            PHP);
     }
 
     /** @return array<string, string> */
