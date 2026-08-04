@@ -19,6 +19,24 @@ jobs:
             -   uses: shivammathur/setup-php@v2
                 with:
                     php-version: ${{ matrix.php-version }}
+                    extensions: mbstring, pdo_sqlite
                     tools: composer
             -   run: composer install --prefer-dist --no-progress
+            -   run: composer validate --strict
+            -   run: composer audit --locked
+            -   name: Provision pinned Tailwind CSS 4.3.3
+                shell: bash
+                run: |
+                    set -Eeuo pipefail
+                    binary="$RUNNER_TEMP/tailwindcss-linux-x64-v4.3.3"
+                    curl --fail --location --silent --show-error \
+                        --output "$binary" \
+                        https://github.com/tailwindlabs/tailwindcss/releases/download/v4.3.3/tailwindcss-linux-x64
+                    printf '%s  %s\n' \
+                        'dc61b3ac6b8c9ca874c0cc4c57b2409791a64c5540404ca5f5367360babc313a' \
+                        "$binary" | sha256sum --check --strict
+                    chmod 0755 "$binary"
+                    printf 'TE4G_TAILWIND_BINARY=%s\n' "$binary" >> "$GITHUB_ENV"
             -   run: make test
+            -   if: matrix.php-version == '8.5'
+                run: make smoke

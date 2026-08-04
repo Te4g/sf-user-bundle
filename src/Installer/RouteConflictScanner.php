@@ -229,6 +229,9 @@ final class RouteConflictScanner
         array $stack,
         int $depth,
     ): void {
+        if ('security.route_loader.logout' === $resource && 'service' === $type) {
+            return;
+        }
         if (str_starts_with($resource, '@')) {
             if (!in_array($resource, self::TRUSTED_BUNDLE_ROUTE_RESOURCES, true)) {
                 $this->add($sourceRelativePath, 'uninspectable-route-resource');
