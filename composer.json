@@ -24,7 +24,7 @@
         "php": "^8.4",
         "ext-mbstring": "*",
         "doctrine/doctrine-bundle": "^3.3",
-        "doctrine/doctrine-migrations-bundle": "^3.4",
+        "doctrine/doctrine-migrations-bundle": "^3.4 || ^4.0",
         "doctrine/orm": "^3.4.4",
         "psr/log": "^3.0",
         "symfony/asset": "^8.1",

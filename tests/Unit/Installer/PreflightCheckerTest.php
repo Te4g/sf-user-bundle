@@ -297,6 +297,44 @@ final class PreflightCheckerTest extends TestCase
         self::assertNotContains('config/routes/framework.yaml|uninspectable-route-resource', $keys);
     }
 
+    public function testOfficialSecurityLogoutServiceRouteResourceIsTrustedExactly(): void
+    {
+        $this->write('config/routes/security.yaml', <<<'YAML'
+            _symfony_logout:
+                resource: security.route_loader.logout
+                type: service
+            YAML);
+
+        self::assertSame([], $this->checker()->check(ProjectLayout::at($this->projectDir)));
+
+        $this->write('config/routes/security.yaml', <<<'YAML'
+            application_routes:
+                resource: application.route_loader
+                type: service
+            YAML);
+
+        $keys = $this->conflictKeys($this->checker()->check(ProjectLayout::at($this->projectDir)));
+        self::assertContains('config/routes/security.yaml|uninspectable-route-resource', $keys);
+    }
+
+    public function testExactUpstreamResetPasswordBootstrapIsCompatibleButApplicationEditsFailClosed(): void
+    {
+        $this->write('config/packages/reset_password.yaml', <<<'YAML'
+            symfonycasts_reset_password:
+                # Replace symfonycasts.reset_password.fake_request_repository with the full
+                # namespace of the password reset request repository after it has been created.
+                # i.e. App\Repository\ResetPasswordRequestRepository
+                request_password_repository: symfonycasts.reset_password.fake_request_repository
+            YAML);
+        file_put_contents($this->projectDir.'/config/packages/reset_password.yaml', "\n", FILE_APPEND);
+
+        self::assertSame([], $this->checker()->check(ProjectLayout::at($this->projectDir)));
+
+        $this->write('config/packages/reset_password.yaml', "symfonycasts_reset_password:\n    request_password_repository: App\\Repository\\ExistingRepository\n");
+        $keys = $this->conflictKeys($this->checker()->check(ProjectLayout::at($this->projectDir)));
+        self::assertContains('config/packages/reset_password.yaml|existing-generated-target', $keys);
+    }
+
     public function testRouteAttributesSupportPositionalNamesAndClassPrefixes(): void
     {
         $this->write('src/Controller/PositionalController.php', <<<'PHP'

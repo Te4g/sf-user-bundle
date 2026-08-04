@@ -622,7 +622,9 @@ final readonly class PreflightChecker
                 continue;
             }
             $contents = is_file($path) && !is_link($path) ? file_get_contents($path) : false;
-            if (is_string($contents) && FlexBootstrap::matches($manifest, $relativePath, $contents)) {
+            if (is_string($contents) && (FlexBootstrap::matches($manifest, $relativePath, $contents)
+                || ResetPasswordRecipeBootstrap::matches($manifest, $relativePath, $contents))
+            ) {
                 continue;
             }
 

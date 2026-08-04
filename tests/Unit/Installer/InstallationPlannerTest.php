@@ -205,6 +205,43 @@ final class InstallationPlannerTest extends TestCase
         self::assertSame($bootstrap, file_get_contents($this->projectDir.'/config/packages/te4g_user.yaml'));
     }
 
+    public function testExactUpstreamResetPasswordRecipeBootstrapIsAControlledFirstInstallReplacement(): void
+    {
+        $bootstrap = <<<'YAML'
+            symfonycasts_reset_password:
+                # Replace symfonycasts.reset_password.fake_request_repository with the full
+                # namespace of the password reset request repository after it has been created.
+                # i.e. App\Repository\ResetPasswordRequestRepository
+                request_password_repository: symfonycasts.reset_password.fake_request_repository
+            YAML;
+        $bootstrap .= "\n";
+        $generated = "symfonycasts_reset_password:\n    request_password_repository: App\\Repository\\ResetPasswordRequestRepository\n";
+        $this->write('config/packages/reset_password.yaml', $bootstrap);
+
+        $plan = $this->planner()->plan(ProjectLayout::at($this->projectDir), [
+            'config/packages/reset_password.yaml' => $generated,
+        ]);
+
+        self::assertFalse($plan->hasConflicts());
+        self::assertCount(1, $plan->files());
+        self::assertSame('managed-update', $plan->files()[0]->mode());
+        self::assertSame(hash('sha256', $bootstrap), $plan->files()[0]->priorHash());
+    }
+
+    public function testEditedUpstreamResetPasswordRecipeBootstrapRemainsAnUnmanagedConflict(): void
+    {
+        $bootstrap = "symfonycasts_reset_password:\n    request_password_repository: App\\Repository\\ExistingRepository\n";
+        $this->write('config/packages/reset_password.yaml', $bootstrap);
+
+        $plan = $this->planner()->plan(ProjectLayout::at($this->projectDir), [
+            'config/packages/reset_password.yaml' => "symfonycasts_reset_password:\n    request_password_repository: App\\Repository\\ResetPasswordRequestRepository\n",
+        ]);
+
+        self::assertTrue($plan->hasConflicts());
+        self::assertSame([], $plan->files());
+        self::assertSame('unmanaged-existing-file', $plan->conflicts()[0]->code());
+    }
+
     public function testMatchingManagedFileMakesRepeatPlanANoOpAndKeepsManifestTimestamp(): void
     {
         $this->write('src/Entity/User.php', 'generated user');
