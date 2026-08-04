@@ -401,6 +401,10 @@ final class InstallCommand extends Command
         if (!is_string($contents)) {
             return $requirements;
         }
+        $entries = $this->phpArrayEntries($contents);
+        if (null === $entries) {
+            throw InstallerExecutionFailed::failed();
+        }
         $registryPath = $layout->path('assets/vendor/installed.php');
         $registry = is_file($registryPath) && !is_link($registryPath)
             ? file_get_contents($registryPath)
@@ -411,14 +415,14 @@ final class InstallCommand extends Command
             if (!is_string($relativePath)) {
                 throw InstallerExecutionFailed::failed();
             }
-            $entryState = $this->phpArrayEntry($contents, $requirement);
-            if (null === $entryState) {
-                if ($this->phpArrayHasKey($contents, $requirement)) {
-                    throw InstallerExecutionFailed::failed();
-                }
+            if (!array_key_exists($requirement, $entries)) {
                 $missing[] = $requirement;
 
                 continue;
+            }
+            $entryState = $entries[$requirement];
+            if (null === $entryState) {
+                throw InstallerExecutionFailed::failed();
             }
             if ($entryState['uninspectableMembers']) {
                 throw InstallerExecutionFailed::failed();
@@ -468,92 +472,211 @@ final class InstallCommand extends Command
     /** @return array{literals: array<string, string>, present: array<string, true>, uninspectableMembers: bool}|null */
     private function phpArrayEntry(string $contents, string $key): ?array
     {
+        $entries = $this->phpArrayEntries($contents);
+        $entry = null === $entries ? null : ($entries[$key] ?? null);
+        if (null === $entry
+            || $entry['uninspectableMembers']
+            || (isset($entry['present']['path']) && !array_key_exists('path', $entry['literals']))
+        ) {
+            return null;
+        }
+
+        return $entry;
+    }
+
+    /**
+     * @return array<string, array{literals: array<string, string>, present: array<string, true>, uninspectableMembers: bool}|null>|null
+     */
+    private function phpArrayEntries(string $contents): ?array
+    {
         try {
             $tokens = array_values(\PhpToken::tokenize($contents, TOKEN_PARSE));
         } catch (\Throwable) {
             return null;
         }
 
-        for ($index = 0, $count = count($tokens); $index < $count; ++$index) {
-            if (T_CONSTANT_ENCAPSED_STRING !== $tokens[$index]->id
-                || $key !== $this->phpStringLiteral($tokens[$index]->text)
-            ) {
-                continue;
-            }
-            $arrow = $this->nextPhpToken($tokens, $index + 1);
-            $value = null === $arrow ? null : $this->nextPhpToken($tokens, $arrow + 1);
-            if (null === $arrow || T_DOUBLE_ARROW !== $tokens[$arrow]->id || null === $value) {
-                continue;
-            }
-            if (T_ARRAY === $tokens[$value]->id) {
-                $value = $this->nextPhpToken($tokens, $value + 1);
-            }
-            if (null === $value || !in_array($tokens[$value]->text, ['[', '('], true)) {
-                continue;
-            }
+        $return = null;
+        foreach ($tokens as $index => $token) {
+            if (T_RETURN === $token->id) {
+                $return = $index;
 
-            $literals = [];
-            $present = [];
-            $literalFieldArrows = [];
-            $uninspectableMembers = false;
-            $depth = 1;
-            for ($cursor = $value + 1; $cursor < $count; ++$cursor) {
-                $text = $tokens[$cursor]->text;
-                if (in_array($text, ['[', '(', '{'], true)) {
-                    ++$depth;
-                    continue;
-                }
-                if (in_array($text, [']', ')', '}'], true)) {
-                    if (0 === --$depth) {
-                        return [
-                            'literals' => $literals,
-                            'present' => $present,
-                            'uninspectableMembers' => $uninspectableMembers,
-                        ];
-                    }
-                    continue;
-                }
-                if (1 === $depth && (
-                    T_ELLIPSIS === $tokens[$cursor]->id
-                    || (T_DOUBLE_ARROW === $tokens[$cursor]->id && !isset($literalFieldArrows[$cursor]))
-                )) {
-                    $uninspectableMembers = true;
-                }
-                if (1 !== $depth || T_CONSTANT_ENCAPSED_STRING !== $tokens[$cursor]->id) {
-                    continue;
-                }
-                $field = $this->phpStringLiteral($tokens[$cursor]->text);
-                $fieldStart = $this->previousPhpToken($tokens, $cursor - 1);
-                $fieldArrow = $this->nextPhpToken($tokens, $cursor + 1);
-                $fieldValue = null === $fieldArrow ? null : $this->nextPhpToken($tokens, $fieldArrow + 1);
-                if (null === $field
-                    || null === $fieldStart
-                    || !in_array($tokens[$fieldStart]->text, ['[', '(', ','], true)
-                    || null === $fieldArrow
-                    || T_DOUBLE_ARROW !== $tokens[$fieldArrow]->id
-                ) {
-                    continue;
-                }
-                $literalFieldArrows[$fieldArrow] = true;
-                $present[$field] = true;
-                unset($literals[$field]);
-                if (null === $fieldValue || T_CONSTANT_ENCAPSED_STRING !== $tokens[$fieldValue]->id) {
-                    continue;
-                }
-                $fieldBoundary = $this->nextPhpToken($tokens, $fieldValue + 1);
-                if (null === $fieldBoundary || !in_array($tokens[$fieldBoundary]->text, [',', ']', ')'], true)) {
-                    continue;
-                }
-                $literal = $this->phpStringLiteral($tokens[$fieldValue]->text);
-                if (null !== $literal) {
-                    $literals[$field] = $literal;
-                }
+                break;
             }
-
+        }
+        if (null === $return) {
+            return null;
+        }
+        $value = $this->nextPhpToken($tokens, $return + 1);
+        $open = null === $value ? null : $this->phpArrayOpeningToken($tokens, $value);
+        if (null === $open) {
             return null;
         }
 
+        $entries = [];
+        $literalMemberArrows = [];
+        $uninspectableMembers = false;
+        $depth = 1;
+        for ($cursor = $open + 1, $count = count($tokens); $cursor < $count; ++$cursor) {
+            $text = $tokens[$cursor]->text;
+            if (in_array($text, ['[', '(', '{'], true)) {
+                ++$depth;
+
+                continue;
+            }
+            if (in_array($text, [']', ')', '}'], true)) {
+                if (0 === --$depth) {
+                    if ($uninspectableMembers || !$this->phpReturnEndsAfterArray($tokens, $cursor)) {
+                        return null;
+                    }
+
+                    return $entries;
+                }
+
+                continue;
+            }
+            if (1 === $depth && (
+                T_ELLIPSIS === $tokens[$cursor]->id
+                || (T_DOUBLE_ARROW === $tokens[$cursor]->id && !isset($literalMemberArrows[$cursor]))
+            )) {
+                $uninspectableMembers = true;
+            }
+            if (1 !== $depth || T_CONSTANT_ENCAPSED_STRING !== $tokens[$cursor]->id) {
+                continue;
+            }
+            $key = $this->phpStringLiteral($tokens[$cursor]->text);
+            $memberStart = $this->previousPhpToken($tokens, $cursor - 1);
+            $arrow = $this->nextPhpToken($tokens, $cursor + 1);
+            if (null === $key
+                || null === $memberStart
+                || !in_array($tokens[$memberStart]->text, ['[', '(', ','], true)
+                || null === $arrow
+                || T_DOUBLE_ARROW !== $tokens[$arrow]->id
+            ) {
+                continue;
+            }
+            $literalMemberArrows[$arrow] = true;
+            $entries[$key] = null;
+            $memberValue = $this->nextPhpToken($tokens, $arrow + 1);
+            if (null === $memberValue) {
+                continue;
+            }
+            $parsed = $this->phpArrayLiteralEntry($tokens, $memberValue);
+            if (null === $parsed) {
+                continue;
+            }
+            $memberBoundary = $this->nextPhpToken($tokens, $parsed['close'] + 1);
+            if (null !== $memberBoundary
+                && in_array($tokens[$memberBoundary]->text, [',', ']', ')'], true)
+            ) {
+                $entries[$key] = $parsed['entry'];
+            }
+        }
+
         return null;
+    }
+
+    /**
+     * @param list<\PhpToken> $tokens
+     *
+     * @return array{entry: array{literals: array<string, string>, present: array<string, true>, uninspectableMembers: bool}, close: int}|null
+     */
+    private function phpArrayLiteralEntry(array $tokens, int $value): ?array
+    {
+        $open = $this->phpArrayOpeningToken($tokens, $value);
+        if (null === $open) {
+            return null;
+        }
+
+        $literals = [];
+        $present = [];
+        $literalFieldArrows = [];
+        $uninspectableMembers = false;
+        $depth = 1;
+        for ($cursor = $open + 1, $count = count($tokens); $cursor < $count; ++$cursor) {
+            $text = $tokens[$cursor]->text;
+            if (in_array($text, ['[', '(', '{'], true)) {
+                ++$depth;
+
+                continue;
+            }
+            if (in_array($text, [']', ')', '}'], true)) {
+                if (0 === --$depth) {
+                    return [
+                        'entry' => [
+                            'literals' => $literals,
+                            'present' => $present,
+                            'uninspectableMembers' => $uninspectableMembers,
+                        ],
+                        'close' => $cursor,
+                    ];
+                }
+
+                continue;
+            }
+            if (1 === $depth && (
+                T_ELLIPSIS === $tokens[$cursor]->id
+                || (T_DOUBLE_ARROW === $tokens[$cursor]->id && !isset($literalFieldArrows[$cursor]))
+            )) {
+                $uninspectableMembers = true;
+            }
+            if (1 !== $depth || T_CONSTANT_ENCAPSED_STRING !== $tokens[$cursor]->id) {
+                continue;
+            }
+            $field = $this->phpStringLiteral($tokens[$cursor]->text);
+            $fieldStart = $this->previousPhpToken($tokens, $cursor - 1);
+            $fieldArrow = $this->nextPhpToken($tokens, $cursor + 1);
+            $fieldValue = null === $fieldArrow ? null : $this->nextPhpToken($tokens, $fieldArrow + 1);
+            if (null === $field
+                || null === $fieldStart
+                || !in_array($tokens[$fieldStart]->text, ['[', '(', ','], true)
+                || null === $fieldArrow
+                || T_DOUBLE_ARROW !== $tokens[$fieldArrow]->id
+            ) {
+                continue;
+            }
+            $literalFieldArrows[$fieldArrow] = true;
+            $present[$field] = true;
+            unset($literals[$field]);
+            if (null === $fieldValue || T_CONSTANT_ENCAPSED_STRING !== $tokens[$fieldValue]->id) {
+                continue;
+            }
+            $fieldBoundary = $this->nextPhpToken($tokens, $fieldValue + 1);
+            if (null === $fieldBoundary || !in_array($tokens[$fieldBoundary]->text, [',', ']', ')'], true)) {
+                continue;
+            }
+            $literal = $this->phpStringLiteral($tokens[$fieldValue]->text);
+            if (null !== $literal) {
+                $literals[$field] = $literal;
+            }
+        }
+
+        return null;
+    }
+
+    /** @param list<\PhpToken> $tokens */
+    private function phpArrayOpeningToken(array $tokens, int $value): ?int
+    {
+        if ('[' === $tokens[$value]->text) {
+            return $value;
+        }
+        if (T_ARRAY !== $tokens[$value]->id) {
+            return null;
+        }
+        $open = $this->nextPhpToken($tokens, $value + 1);
+
+        return null !== $open && '(' === $tokens[$open]->text ? $open : null;
+    }
+
+    /** @param list<\PhpToken> $tokens */
+    private function phpReturnEndsAfterArray(array $tokens, int $close): bool
+    {
+        $semicolon = $this->nextPhpToken($tokens, $close + 1);
+        if (null === $semicolon || ';' !== $tokens[$semicolon]->text) {
+            return false;
+        }
+        $after = $this->nextPhpToken($tokens, $semicolon + 1);
+
+        return null === $after || T_CLOSE_TAG === $tokens[$after]->id;
     }
 
     /** @param list<\PhpToken> $tokens */
@@ -566,29 +689,6 @@ final class InstallCommand extends Command
         }
 
         return null;
-    }
-
-    private function phpArrayHasKey(string $contents, string $key): bool
-    {
-        try {
-            $tokens = array_values(\PhpToken::tokenize($contents, TOKEN_PARSE));
-        } catch (\Throwable) {
-            throw InstallerExecutionFailed::failed();
-        }
-
-        for ($index = 0, $count = count($tokens); $index < $count; ++$index) {
-            if (T_CONSTANT_ENCAPSED_STRING !== $tokens[$index]->id
-                || $key !== $this->phpStringLiteral($tokens[$index]->text)
-            ) {
-                continue;
-            }
-            $arrow = $this->nextPhpToken($tokens, $index + 1);
-            if (null !== $arrow && T_DOUBLE_ARROW === $tokens[$arrow]->id) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /** @param list<\PhpToken> $tokens */

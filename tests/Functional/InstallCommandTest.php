@@ -571,6 +571,79 @@ final class InstallCommandTest extends TestCase
         yield 'spread' => ['...dynamic_entry()'];
     }
 
+    #[DataProvider('uninspectableCompleteImportmapProvider')]
+    public function testStaticImportmapInspectionRejectsAnIncompleteValueOrAmbiguousOuterArray(
+        string $requirement,
+        string $members,
+    ): void {
+        $reflection = new \ReflectionClass(InstallCommand::class);
+        $method = $reflection->getMethod('phpArrayEntry');
+
+        $entry = $method->invoke(
+            $reflection->newInstanceWithoutConstructor(),
+            $this->completeImportmapContents($members),
+            $requirement,
+        );
+
+        self::assertNull($entry);
+    }
+
+    #[DataProvider('uninspectableCompleteImportmapProvider')]
+    public function testIncompleteValueOrAmbiguousOuterImportmapFailsClosedBeforeWritesOrProcesses(
+        string $requirement,
+        string $members,
+    ): void {
+        $this->writeCompleteRemoteImportmapFixture($members);
+        $runner = new InstallerCommandProcessRunner($this->projectDir);
+        $migration = new InstallerCommandMigrationGenerator($this->projectDir);
+        $before = $this->inventory();
+        $tester = $this->command($runner, $migration);
+
+        $status = $tester->execute(['--no-interaction' => true], ['interactive' => false]);
+
+        self::assertSame(Command::FAILURE, $status);
+        self::assertSame($before, $this->inventory());
+        self::assertSame([], $runner->calls);
+        self::assertSame(0, $migration->calls);
+        self::assertFileDoesNotExist($this->projectDir.'/src/Entity/User.php');
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function uninspectableCompleteImportmapProvider(): iterable
+    {
+        yield 'array union after shadcn value' => [
+            'shadcn/dist/tailwind.css',
+            <<<'PHP'
+                'shadcn/dist/tailwind.css' => ['version' => '4.16.1', 'type' => 'css'] + ['path' => dynamic_path()],
+                'tw-animate-css/dist/tw-animate.css' => ['version' => '1.4.0', 'type' => 'css'],
+                PHP,
+        ];
+        yield 'later duplicate tw animate key' => [
+            'tw-animate-css/dist/tw-animate.css',
+            <<<'PHP'
+                'shadcn/dist/tailwind.css' => ['version' => '4.16.1', 'type' => 'css'],
+                'tw-animate-css/dist/tw-animate.css' => ['version' => '1.4.0', 'type' => 'css'],
+                'tw-animate-css/dist/tw-animate.css' => ['path' => dynamic_path(), 'version' => '1.4.0', 'type' => 'css'],
+                PHP,
+        ];
+        yield 'later dynamic outer key' => [
+            'shadcn/dist/tailwind.css',
+            <<<'PHP'
+                'shadcn/dist/tailwind.css' => ['version' => '4.16.1', 'type' => 'css'],
+                'tw-animate-css/dist/tw-animate.css' => ['version' => '1.4.0', 'type' => 'css'],
+                dynamic_package_name() => ['path' => dynamic_path()],
+                PHP,
+        ];
+        yield 'later outer spread' => [
+            'tw-animate-css/dist/tw-animate.css',
+            <<<'PHP'
+                'shadcn/dist/tailwind.css' => ['version' => '4.16.1', 'type' => 'css'],
+                'tw-animate-css/dist/tw-animate.css' => ['version' => '1.4.0', 'type' => 'css'],
+                ...dynamic_packages(),
+                PHP,
+        ];
+    }
+
     public function testPartiallyPreinstalledImportmapRequiresOnlyMissingPackage(): void
     {
         $this->write('importmap.php', <<<'PHP'
@@ -1195,6 +1268,29 @@ final class InstallCommandTest extends TestCase
                 'tw-animate-css/dist/tw-animate.css' => ['version' => '1.4.0', 'dependencies' => [], 'extraFiles' => []],
             ];
             PHP);
+    }
+
+    private function writeCompleteRemoteImportmapFixture(string $members): void
+    {
+        $this->write('importmap.php', $this->completeImportmapContents($members));
+        $this->write('assets/vendor/shadcn/dist/tailwind.css', "remote shadcn\n");
+        $this->write('assets/vendor/tw-animate-css/dist/tw-animate.css', "remote animation\n");
+        $this->write('assets/vendor/installed.php', <<<'PHP'
+            <?php
+
+            return [
+                'shadcn/dist/tailwind.css' => ['version' => '4.16.1', 'dependencies' => [], 'extraFiles' => []],
+                'tw-animate-css/dist/tw-animate.css' => ['version' => '1.4.0', 'dependencies' => [], 'extraFiles' => []],
+            ];
+            PHP);
+    }
+
+    private function completeImportmapContents(string $members): string
+    {
+        return sprintf(
+            "<?php\n\nreturn [\n    'app' => ['path' => './assets/app.js', 'entrypoint' => true],\n%s\n];\n",
+            $members,
+        );
     }
 
     /** @return array<string, string> */
