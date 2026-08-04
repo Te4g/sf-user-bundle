@@ -53,6 +53,7 @@ final class ShadcnSkeletonTest extends TestCase
         $rendered = (new SkeletonRenderer())->renderAll(ProjectLayout::at($this->projectDirectory));
 
         foreach ([
+            'templates/bundles/Te4gUserBundle/layout.html.twig',
             'templates/bundles/Te4gUserBundle/registration/register.html.twig',
             'templates/bundles/Te4gUserBundle/security/login.html.twig',
             'templates/bundles/Te4gUserBundle/security/login_link_check.html.twig',
@@ -83,6 +84,28 @@ final class ShadcnSkeletonTest extends TestCase
         self::assertStringContainsString('<twig:Card>', $rendered['templates/bundles/Te4gUserBundle/security/login.html.twig']);
         self::assertStringContainsString('<twig:Button', $rendered['templates/bundles/Te4gUserBundle/security/login.html.twig']);
         self::assertStringContainsString('aria-live="polite"', $rendered['templates/bundles/Te4gUserBundle/security/login.html.twig']);
+    }
+
+    public function testEveryHtmlPageUsesTheSingleApplicationOwnedAssetLayout(): void
+    {
+        $rendered = (new SkeletonRenderer())->renderAll(ProjectLayout::at($this->projectDirectory));
+        $layout = $rendered['templates/bundles/Te4gUserBundle/layout.html.twig'];
+
+        self::assertSame(1, substr_count($layout, "asset('styles/app.css')"));
+        self::assertSame(1, substr_count($layout, "importmap('app')"));
+
+        foreach ($rendered as $path => $template) {
+            if (!str_starts_with($path, 'templates/bundles/Te4gUserBundle/')
+                || str_starts_with($path, 'templates/bundles/Te4gUserBundle/email/')
+                || str_ends_with($path, '/layout.html.twig')
+            ) {
+                continue;
+            }
+
+            self::assertStringContainsString("{% extends 'bundles/Te4gUserBundle/layout.html.twig' %}", $template, $path);
+            self::assertStringNotContainsString('<!doctype html>', $template, $path);
+            self::assertStringNotContainsString("importmap('app')", $template, $path);
+        }
     }
 
     public function testFormsPreserveFieldCsrfRouteAndAccessibleDialogContracts(): void
@@ -146,8 +169,8 @@ final class ShadcnSkeletonTest extends TestCase
         self::assertStringContainsString('@import "tailwindcss";', $css);
         self::assertStringContainsString('@import "../vendor/shadcn/dist/tailwind.css";', $css);
         self::assertStringContainsString('@import "../vendor/tw-animate-css/dist/tw-animate.css";', $css);
-        self::assertStringContainsString('/* te4g-user:shadcn:start */', $css);
-        self::assertStringContainsString('/* te4g-user:shadcn:end */', $css);
+        self::assertSame(1, substr_count($css, '/* <te4g-user name="shadcn"> */'));
+        self::assertSame(1, substr_count($css, '/* </te4g-user> */'));
 
         $translationPath = $this->projectDirectory.'/Te4gUserBundle.en.xlf';
         file_put_contents($translationPath, $rendered['translations/Te4gUserBundle.en.xlf']);

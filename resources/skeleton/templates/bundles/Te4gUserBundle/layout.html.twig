@@ -1,0 +1,14 @@
+{% trans_default_domain 'Te4gUserBundle' %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}{{ 'account.title'|trans }}{% endblock %}</title>
+    <link rel="stylesheet" href="{{ asset('styles/app.css') }}">
+    {{ importmap('app') }}
+</head>
+<body class="min-h-screen bg-background text-foreground">
+{% block body %}{% endblock %}
+</body>
+</html>

@@ -37,6 +37,7 @@ final readonly class SkeletonRenderer
         'templates/bundles/Te4gUserBundle/email/magic_link.html.twig' => 'templates/bundles/Te4gUserBundle/email/magic_link.html.twig',
         'templates/bundles/Te4gUserBundle/email/password_reset.html.twig' => 'templates/bundles/Te4gUserBundle/email/password_reset.html.twig',
         'templates/bundles/Te4gUserBundle/email/verify.html.twig' => 'templates/bundles/Te4gUserBundle/email/verify.html.twig',
+        'templates/bundles/Te4gUserBundle/layout.html.twig' => 'templates/bundles/Te4gUserBundle/layout.html.twig',
         'templates/bundles/Te4gUserBundle/password/request.html.twig' => 'templates/bundles/Te4gUserBundle/password/request.html.twig',
         'templates/bundles/Te4gUserBundle/password/reset.html.twig' => 'templates/bundles/Te4gUserBundle/password/reset.html.twig',
         'templates/bundles/Te4gUserBundle/registration/register.html.twig' => 'templates/bundles/Te4gUserBundle/registration/register.html.twig',

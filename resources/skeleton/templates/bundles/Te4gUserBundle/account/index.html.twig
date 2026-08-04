@@ -1,8 +1,7 @@
+{% extends 'bundles/Te4gUserBundle/layout.html.twig' %}
 {% trans_default_domain 'Te4gUserBundle' %}
-<!doctype html>
-<html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{{ 'account.title'|trans }}</title></head>
-<body class="min-h-screen bg-background text-foreground">
+{% block title %}{{ 'account.title'|trans }}{% endblock %}
+{% block body %}
 <main class="mx-auto w-full max-w-2xl space-y-8 px-4 py-12">
     <header class="space-y-1"><h1 class="text-2xl font-semibold tracking-tight">{{ 'account.title'|trans }}</h1><p class="text-sm text-muted-foreground">{{ 'account.navigation'|trans }}</p></header>
     <div aria-live="polite">{% if deletion_failed %}<twig:Alert variant="destructive"><twig:ux:icon name="lucide:triangle-alert" /><twig:Alert:Title>{{ 'account.deletion_failed'|trans }}</twig:Alert:Title></twig:Alert>{% endif %}</div>
@@ -23,8 +22,8 @@
             <twig:AlertDialog id="delete-account">
                 {{ form_start(deletion_form, {attr: {class: 'space-y-4', 'data-alert-dialog-target': 'form'}}) }}
                     {% if deletion_form.vars.submitted and not deletion_form.vars.valid %}<twig:Alert variant="destructive"><twig:Alert:Title>{{ 'form.error_summary'|trans }}</twig:Alert:Title><twig:Alert:Description>{{ form_errors(deletion_form) }}</twig:Alert:Description></twig:Alert>{% endif %}
-                    <twig:Field data-controller="password-visibility" data-password-visibility-show-label-value="{{ 'password.show'|trans }}" data-password-visibility-hide-label-value="{{ 'password.hide'|trans }}"><twig:Field:Label>{{ form_label(deletion_form.currentPassword) }}</twig:Field:Label><div class="relative">{{ form_widget(deletion_form.currentPassword, {attr: {'aria-describedby': 'delete_account_currentPassword_errors', 'data-password-visibility-target': 'input', class: 'pr-28'}}) }}<twig:Button type="button" variant="ghost" size="sm" class="absolute right-1 top-1" aria-pressed="false" data-password-visibility-target="button" data-action="click->password-visibility#toggle"><twig:ux:icon name="lucide:eye" /><span data-password-visibility-target="label">{{ 'password.show'|trans }}</span></twig:Button></div>{{ form_errors(deletion_form.currentPassword) }}</twig:Field>
-                    <twig:Field orientation="horizontal"><div>{{ form_widget(deletion_form.confirm, {attr: {'aria-describedby': 'delete_account_confirm_errors'}}) }}</div><twig:Field:Content><twig:Field:Label>{{ form_label(deletion_form.confirm) }}</twig:Field:Label>{{ form_errors(deletion_form.confirm) }}</twig:Field:Content></twig:Field>
+                    <twig:Field data-controller="password-visibility" data-password-visibility-show-label-value="{{ 'password.show'|trans }}" data-password-visibility-hide-label-value="{{ 'password.hide'|trans }}"><twig:Field:Label for="{{ deletion_form.currentPassword.vars.id }}" class="{{ deletion_form.currentPassword.vars.required ? 'required' : '' }}">{{ deletion_form.currentPassword.vars.label|trans(deletion_form.currentPassword.vars.label_translation_parameters, deletion_form.currentPassword.vars.translation_domain) }}</twig:Field:Label><div class="relative">{{ form_widget(deletion_form.currentPassword, {attr: {'aria-describedby': 'delete_account_currentPassword_errors', 'data-password-visibility-target': 'input', class: 'pr-28'}}) }}<twig:Button type="button" variant="ghost" size="sm" class="absolute right-1 top-1" aria-pressed="false" data-password-visibility-target="button" data-action="click->password-visibility#toggle"><twig:ux:icon name="lucide:eye" /><span data-password-visibility-target="label">{{ 'password.show'|trans }}</span></twig:Button></div>{{ form_errors(deletion_form.currentPassword) }}</twig:Field>
+                    <twig:Field orientation="horizontal"><div>{{ form_widget(deletion_form.confirm, {attr: {'aria-describedby': 'delete_account_confirm_errors'}}) }}</div><twig:Field:Content><twig:Field:Label for="{{ deletion_form.confirm.vars.id }}" class="{{ deletion_form.confirm.vars.required ? 'required' : '' }}">{{ deletion_form.confirm.vars.label|trans(deletion_form.confirm.vars.label_translation_parameters, deletion_form.confirm.vars.translation_domain) }}</twig:Field:Label>{{ form_errors(deletion_form.confirm) }}</twig:Field:Content></twig:Field>
                     {{ form_widget(deletion_form._token) }}
                     <twig:AlertDialog:Trigger><twig:Button type="button" variant="destructive" {{ ...alert_dialog_trigger_attrs }}><twig:ux:icon name="lucide:trash-2" />{{ 'account.delete_submit'|trans }}</twig:Button></twig:AlertDialog:Trigger>
                     <twig:AlertDialog:Content>
@@ -36,5 +35,4 @@
         </section>
     {% endif %}
 </main>
-</body>
-</html>
+{% endblock %}

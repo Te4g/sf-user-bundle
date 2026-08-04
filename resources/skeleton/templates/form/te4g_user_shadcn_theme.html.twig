@@ -18,9 +18,7 @@
 {% endblock %}
 
 {% block form_errors %}
-    {% if errors|length > 0 %}
-        <ul id="{{ id }}_errors" class="mt-1 space-y-1 text-sm text-destructive" role="alert">
-            {% for error in errors %}<li>{{ error.message }}</li>{% endfor %}
-        </ul>
-    {% endif %}
+    <ul id="{{ id }}_errors" class="mt-1 space-y-1 text-sm text-destructive{{ errors|length == 0 ? ' hidden' : '' }}"{% if errors|length > 0 %} role="alert"{% endif %}>
+        {% for error in errors %}<li>{{ error.message }}</li>{% endfor %}
+    </ul>
 {% endblock %}

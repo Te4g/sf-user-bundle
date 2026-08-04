@@ -1,8 +1,8 @@
-/* te4g-user:shadcn:start */
 @import "tailwindcss";
 @import "../vendor/shadcn/dist/tailwind.css";
 @import "../vendor/tw-animate-css/dist/tw-animate.css";
 
+/* <te4g-user name="shadcn"> */
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -82,4 +82,4 @@
         @apply bg-background text-foreground antialiased;
     }
 }
-/* te4g-user:shadcn:end */
+/* </te4g-user> */
