@@ -56,6 +56,11 @@ final readonly class InstallationPlanner
 
             $currentHash = hash('sha256', $currentContents);
             if (null === $priorHash) {
+                if (FlexBootstrap::matches($currentManifest, $relativePath, $currentContents)) {
+                    $plannedFiles[] = PlannedFile::managedUpdate($relativePath, $currentHash, $contents);
+
+                    continue;
+                }
                 $conflicts[] = InstallerConflict::forPath($relativePath, 'unmanaged-existing-file');
 
                 continue;

@@ -133,6 +133,78 @@ final class InstallationPlannerTest extends TestCase
         self::assertSame('application user', file_get_contents($this->projectDir.'/src/Entity/User.php'));
     }
 
+    public function testExactFlexBootstrapIsPlannedAsAControlledFirstInstallReplacement(): void
+    {
+        $bootstrap = "te4g_user:\n    enabled: false\n";
+        $generated = "te4g_user:\n    enabled: true\n";
+        $this->write('config/packages/te4g_user.yaml', $bootstrap);
+
+        $plan = $this->planner()->plan(ProjectLayout::at($this->projectDir), [
+            'config/packages/te4g_user.yaml' => $generated,
+        ]);
+
+        self::assertFalse($plan->hasConflicts());
+        self::assertCount(1, $plan->files());
+        self::assertSame('managed-update', $plan->files()[0]->mode());
+        self::assertSame(hash('sha256', $bootstrap), $plan->files()[0]->priorHash());
+        self::assertSame($bootstrap, file_get_contents($this->projectDir.'/config/packages/te4g_user.yaml'));
+    }
+
+    /** The Flex handoff is a byte-exact predecessor, never a generic unmanaged-file overwrite rule. */
+    #[DataProvider('flexBootstrapLookalikes')]
+    public function testFlexBootstrapLookalikesRemainUnmanagedConflicts(string $path, string $contents): void
+    {
+        $this->write($path, $contents);
+
+        $plan = $this->planner()->plan(ProjectLayout::at($this->projectDir), [
+            $path => "te4g_user:\n    enabled: true\n",
+        ]);
+
+        self::assertTrue($plan->hasConflicts());
+        self::assertSame([], $plan->files());
+        self::assertSame('unmanaged-existing-file', $plan->conflicts()[0]->code());
+        self::assertSame($contents, file_get_contents($this->projectDir.'/'.$path));
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function flexBootstrapLookalikes(): iterable
+    {
+        yield 'extra comment' => [
+            'config/packages/te4g_user.yaml',
+            "# application-owned\nte4g_user:\n    enabled: false\n",
+        ];
+        yield 'extra option' => [
+            'config/packages/te4g_user.yaml',
+            "te4g_user:\n    enabled: false\n    features: { account_deletion: false }\n",
+        ];
+        yield 'missing final newline' => [
+            'config/packages/te4g_user.yaml',
+            "te4g_user:\n    enabled: false",
+        ];
+        yield 'different target' => [
+            'config/packages/te4g_user_bootstrap.yaml',
+            "te4g_user:\n    enabled: false\n",
+        ];
+    }
+
+    public function testExactFlexBootstrapWithExistingManifestOwnershipMismatchRemainsAConflict(): void
+    {
+        $bootstrap = "te4g_user:\n    enabled: false\n";
+        $this->write('config/packages/te4g_user.yaml', $bootstrap);
+        $this->writeManifest([
+            'config/packages/te4g_user.yaml' => hash('sha256', "te4g_user:\n    enabled: true\n"),
+        ]);
+
+        $plan = $this->planner()->plan(ProjectLayout::at($this->projectDir), [
+            'config/packages/te4g_user.yaml' => "te4g_user:\n    enabled: true\n",
+        ]);
+
+        self::assertTrue($plan->hasConflicts());
+        self::assertSame([], $plan->files());
+        self::assertSame('modified-managed-file', $plan->conflicts()[0]->code());
+        self::assertSame($bootstrap, file_get_contents($this->projectDir.'/config/packages/te4g_user.yaml'));
+    }
+
     public function testMatchingManagedFileMakesRepeatPlanANoOpAndKeepsManifestTimestamp(): void
     {
         $this->write('src/Entity/User.php', 'generated user');

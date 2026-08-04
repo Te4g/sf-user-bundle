@@ -796,6 +796,22 @@ final class InstallCommandTest extends TestCase
         $this->assertRolledBackToFreshState();
     }
 
+    public function testDownstreamFailureRestoresTheExactDisabledFlexBootstrap(): void
+    {
+        $bootstrap = "te4g_user:\n    enabled: false\n";
+        $this->write('config/packages/te4g_user.yaml', $bootstrap);
+        $runner = new InstallerCommandProcessRunner($this->projectDir, 'lint:container');
+        $migration = new InstallerCommandMigrationGenerator($this->projectDir);
+
+        $tester = $this->command($runner, $migration);
+        $status = $tester->execute(['--no-interaction' => true], ['interactive' => false]);
+
+        self::assertSame(Command::FAILURE, $status, $tester->getDisplay());
+        self::assertSame(['importmap:require', 'lint:container'], array_column($runner->calls, 'name'));
+        self::assertSame($bootstrap, $this->read('config/packages/te4g_user.yaml'));
+        self::assertFileDoesNotExist($this->projectDir.'/config/te4g_user.install.json');
+    }
+
     public function testMigrationFailureRollsBackEveryGeneratedFileAndHidesFailureDetails(): void
     {
         $runner = new InstallerCommandProcessRunner($this->projectDir);
