@@ -11,6 +11,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Yaml\Yaml;
+use Symfonycasts\TailwindBundle\TailwindBinary;
 use Te4g\UserBundle\Exception\InstallerConflict;
 use Te4g\UserBundle\Exception\InstallerExecutionFailed;
 use Te4g\UserBundle\Exception\InstallerRollbackIncomplete;
@@ -43,11 +44,12 @@ final class InstallCommand extends Command
     private const string IMPORTMAP_REQUIREMENTS = 'importmap.required.json';
     private const string TAILWIND_CONFIG = 'config/packages/te4g_user_tailwind.yaml';
     private const string TAILWIND_VERSION = 'v4.3.3';
+    private const string TAILWIND_RUNTIME_PREFIX = 'var/tailwind/';
 
-    /** @var list<string> */
-    private const array IMPORTMAP_PACKAGES = [
-        'shadcn/dist/tailwind.css',
-        'tw-animate-css/dist/tw-animate.css',
+    /** @var array<string, string> */
+    private const array IMPORTMAP_PACKAGE_PATHS = [
+        'shadcn/dist/tailwind.css' => 'assets/vendor/shadcn/dist/tailwind.css',
+        'tw-animate-css/dist/tw-animate.css' => 'assets/vendor/tw-animate-css/dist/tw-animate.css',
     ];
 
     public function __construct(
@@ -94,15 +96,16 @@ final class InstallCommand extends Command
             }
 
             $tailwindConfigurationNeeded = !$this->tailwindIsConfigured($layout);
-            $importmapInstallationNeeded = !$this->importmapIsInstalled($layout, $requirements);
-            $this->printPlan($io, $plan, $tailwindConfigurationNeeded, $importmapInstallationNeeded);
+            $missingImportmapRequirements = $this->missingImportmapRequirements($layout, $requirements);
+            $this->printPlan($io, $plan, $tailwindConfigurationNeeded, $missingImportmapRequirements);
 
             $currentManifest = $this->manifestStore->load($layout);
             if ([] === $plan->files()
                 && !$tailwindConfigurationNeeded
-                && !$importmapInstallationNeeded
+                && [] === $missingImportmapRequirements
                 && null !== $currentManifest
-                && $this->manifestOwnsRenderedFiles($layout, $currentManifest->files(), $renderedFiles)
+                && $this->manifestOwnsRenderedFiles($currentManifest->files(), $renderedFiles)
+                && !$this->manifestContainsTailwindRuntime($currentManifest->files())
             ) {
                 $io->success('Already installed; no changes required.');
 
@@ -136,15 +139,22 @@ final class InstallCommand extends Command
                 $io->writeln('Tailwind CSS was already configured.');
             }
 
-            if ($importmapInstallationNeeded) {
+            if ([] !== $missingImportmapRequirements) {
+                $importmapWrites = ['assets/vendor/installed.php', 'importmap.php'];
+                foreach ($missingImportmapRequirements as $requirement) {
+                    $importmapWrites[] = self::IMPORTMAP_PACKAGE_PATHS[$requirement];
+                }
                 $this->runConsoleStep(
                     $transaction,
                     $layout,
-                    ['importmap:require', ...$requirements, '--no-interaction'],
-                    ['importmap.php'],
-                    ['assets/vendor/shadcn', 'assets/vendor/tw-animate-css'],
-                    3,
+                    ['importmap:require', ...$missingImportmapRequirements, '--no-interaction'],
+                    $importmapWrites,
+                    [],
+                    2 + count($missingImportmapRequirements),
                 );
+                if ([] !== $this->missingImportmapRequirements($layout, $requirements)) {
+                    throw InstallerExecutionFailed::failed();
+                }
                 $io->writeln('Installed import-map requirements.');
             } else {
                 $io->writeln('Import-map requirements were already installed.');
@@ -152,7 +162,15 @@ final class InstallCommand extends Command
 
             $this->runConsoleStep($transaction, $layout, ['lint:container', '--no-interaction']);
             $io->writeln('Validated the service container.');
-            $this->runConsoleStep($transaction, $layout, ['tailwind:build', '--no-interaction']);
+            $tailwindRuntime = $this->tailwindRuntimePlan($layout);
+            $this->runConsoleStep(
+                $transaction,
+                $layout,
+                ['tailwind:build', '--no-interaction'],
+                $tailwindRuntime['allowedPaths'],
+                maximumChanges: count($tailwindRuntime['allowedPaths']),
+            );
+            $this->validateTailwindRuntime($layout, $tailwindRuntime);
             $io->writeln('Built Tailwind CSS.');
             $this->runConsoleStep($transaction, $layout, ['lint:twig', 'templates', '--no-interaction']);
             $io->writeln('Linted Twig templates.');
@@ -178,7 +196,11 @@ final class InstallCommand extends Command
                 ? 'No Doctrine migration was required.'
                 : 'Generated Doctrine migration for review.');
 
-            $manifest = $this->finalManifest($layout, $renderedFiles, $transaction->externallyWrittenPaths());
+            $persistentExternalPaths = array_values(array_filter(
+                $transaction->externallyWrittenPaths(),
+                static fn (string $relativePath): bool => !str_starts_with($relativePath, self::TAILWIND_RUNTIME_PREFIX),
+            ));
+            $manifest = $this->finalManifest($layout, $renderedFiles, $persistentExternalPaths);
             $transaction->write(ManifestStore::RELATIVE_PATH, $manifest->toJson());
             $io->writeln('Finalized installation manifest.');
 
@@ -226,7 +248,7 @@ final class InstallCommand extends Command
         } catch (\JsonException) {
             throw InstallerExecutionFailed::failed();
         }
-        if (self::IMPORTMAP_PACKAGES !== $requirements) {
+        if (array_keys(self::IMPORTMAP_PACKAGE_PATHS) !== $requirements) {
             throw InstallerExecutionFailed::failed();
         }
 
@@ -302,6 +324,22 @@ final class InstallCommand extends Command
 
     private function tailwindIsConfigured(ProjectLayout $layout): bool
     {
+        $settings = $this->tailwindSettings($layout);
+
+        return null !== $settings['binary'] || null !== $settings['binaryVersion'];
+    }
+
+    /**
+     * @return array{binary: ?string, binaryVersion: ?string, binaryPlatform: string, inputCss: string}
+     */
+    private function tailwindSettings(ProjectLayout $layout): array
+    {
+        $settings = [
+            'binary' => null,
+            'binaryVersion' => null,
+            'binaryPlatform' => 'auto',
+            'inputCss' => 'assets/styles/app.css',
+        ];
         $directory = $layout->path('config/packages');
         foreach (scandir($directory) ?: [] as $entry) {
             if (!preg_match('/\.ya?ml$/', $entry)) {
@@ -320,41 +358,224 @@ final class InstallCommand extends Command
             if (!is_array($tailwind)) {
                 continue;
             }
-            if (isset($tailwind['binary']) && is_string($tailwind['binary']) && '' !== trim($tailwind['binary'])) {
-                return true;
+            if (array_key_exists('binary', $tailwind)) {
+                if (null !== $tailwind['binary'] && !is_string($tailwind['binary'])) {
+                    throw InstallerExecutionFailed::failed();
+                }
+                $binary = is_string($tailwind['binary']) ? trim($tailwind['binary']) : '';
+                $settings['binary'] = '' === $binary ? null : $binary;
             }
-            if (isset($tailwind['binary_version']) && is_string($tailwind['binary_version']) && '' !== trim($tailwind['binary_version'])) {
-                return true;
+            if (array_key_exists('binary_version', $tailwind)) {
+                if (null !== $tailwind['binary_version'] && !is_string($tailwind['binary_version'])) {
+                    throw InstallerExecutionFailed::failed();
+                }
+                $version = is_string($tailwind['binary_version']) ? trim($tailwind['binary_version']) : '';
+                $settings['binaryVersion'] = '' === $version ? null : 'v'.ltrim($version, 'vV');
+            }
+            if (array_key_exists('binary_platform', $tailwind)) {
+                if (!is_string($tailwind['binary_platform']) || '' === trim($tailwind['binary_platform'])) {
+                    throw InstallerExecutionFailed::failed();
+                }
+                $settings['binaryPlatform'] = trim($tailwind['binary_platform']);
+            }
+            if (array_key_exists('input_css', $tailwind)) {
+                $inputCss = is_array($tailwind['input_css']) ? reset($tailwind['input_css']) : $tailwind['input_css'];
+                if (!is_string($inputCss) || '' === trim($inputCss)) {
+                    throw InstallerExecutionFailed::failed();
+                }
+                $settings['inputCss'] = trim($inputCss);
             }
         }
 
-        return false;
+        return $settings;
     }
 
-    /** @param list<string> $requirements */
-    private function importmapIsInstalled(ProjectLayout $layout, array $requirements): bool
+    /**
+     * @param list<string> $requirements
+     *
+     * @return list<string>
+     */
+    private function missingImportmapRequirements(ProjectLayout $layout, array $requirements): array
     {
         $contents = file_get_contents($layout->path('importmap.php'));
         if (!is_string($contents)) {
-            return false;
+            return $requirements;
         }
+        $registryPath = $layout->path('assets/vendor/installed.php');
+        $registry = is_file($registryPath) && !is_link($registryPath)
+            ? file_get_contents($registryPath)
+            : false;
+        $missing = [];
         foreach ($requirements as $requirement) {
-            if (!str_contains($contents, "'".$requirement."'") && !str_contains($contents, '"'.$requirement.'"')) {
-                return false;
+            $relativePath = self::IMPORTMAP_PACKAGE_PATHS[$requirement] ?? null;
+            if (!is_string($relativePath)) {
+                throw InstallerExecutionFailed::failed();
             }
-        }
-
-        foreach ([
-            'assets/vendor/shadcn/dist/tailwind.css',
-            'assets/vendor/tw-animate-css/dist/tw-animate.css',
-        ] as $relativePath) {
             $path = $layout->path($relativePath);
-            if (!is_file($path) || is_link($path)) {
-                return false;
+            $entry = $this->phpArrayEntry($contents, $requirement);
+            $registered = is_string($registry) ? $this->phpArrayEntry($registry, $requirement) : null;
+            $localPaths = [$relativePath, './'.$relativePath];
+            $isLocal = null !== $entry && in_array($entry['path'] ?? null, $localPaths, true);
+            $isRemote = null !== $entry
+                && isset($entry['version'])
+                && '' !== $entry['version']
+                && 'css' === ($entry['type'] ?? null)
+                && null !== $registered
+                && isset($registered['version'])
+                && '' !== $registered['version'];
+            if ((!$isLocal && !$isRemote)
+                || !is_file($path)
+                || is_link($path)
+            ) {
+                $missing[] = $requirement;
             }
         }
 
-        return true;
+        return $missing;
+    }
+
+    /** @return array<string, string>|null */
+    private function phpArrayEntry(string $contents, string $key): ?array
+    {
+        try {
+            $tokens = array_values(\PhpToken::tokenize($contents, TOKEN_PARSE));
+        } catch (\Throwable) {
+            return null;
+        }
+
+        for ($index = 0, $count = count($tokens); $index < $count; ++$index) {
+            if (T_CONSTANT_ENCAPSED_STRING !== $tokens[$index]->id
+                || $key !== $this->phpStringLiteral($tokens[$index]->text)
+            ) {
+                continue;
+            }
+            $arrow = $this->nextPhpToken($tokens, $index + 1);
+            $value = null === $arrow ? null : $this->nextPhpToken($tokens, $arrow + 1);
+            if (null === $arrow || T_DOUBLE_ARROW !== $tokens[$arrow]->id || null === $value) {
+                continue;
+            }
+            if (T_ARRAY === $tokens[$value]->id) {
+                $value = $this->nextPhpToken($tokens, $value + 1);
+            }
+            if (null === $value || !in_array($tokens[$value]->text, ['[', '('], true)) {
+                continue;
+            }
+
+            $fields = [];
+            $depth = 1;
+            for ($cursor = $value + 1; $cursor < $count; ++$cursor) {
+                $text = $tokens[$cursor]->text;
+                if (in_array($text, ['[', '(', '{'], true)) {
+                    ++$depth;
+                    continue;
+                }
+                if (in_array($text, [']', ')', '}'], true)) {
+                    if (0 === --$depth) {
+                        return $fields;
+                    }
+                    continue;
+                }
+                if (1 !== $depth || T_CONSTANT_ENCAPSED_STRING !== $tokens[$cursor]->id) {
+                    continue;
+                }
+                $field = $this->phpStringLiteral($tokens[$cursor]->text);
+                $fieldArrow = $this->nextPhpToken($tokens, $cursor + 1);
+                $fieldValue = null === $fieldArrow ? null : $this->nextPhpToken($tokens, $fieldArrow + 1);
+                if (null === $field
+                    || null === $fieldArrow
+                    || T_DOUBLE_ARROW !== $tokens[$fieldArrow]->id
+                    || null === $fieldValue
+                    || T_CONSTANT_ENCAPSED_STRING !== $tokens[$fieldValue]->id
+                ) {
+                    continue;
+                }
+                $literal = $this->phpStringLiteral($tokens[$fieldValue]->text);
+                if (null !== $literal) {
+                    $fields[$field] = $literal;
+                }
+            }
+
+            return null;
+        }
+
+        return null;
+    }
+
+    /** @param list<\PhpToken> $tokens */
+    private function nextPhpToken(array $tokens, int $offset): ?int
+    {
+        for ($index = $offset, $count = count($tokens); $index < $count; ++$index) {
+            if (!in_array($tokens[$index]->id, [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true)) {
+                return $index;
+            }
+        }
+
+        return null;
+    }
+
+    private function phpStringLiteral(string $literal): ?string
+    {
+        if (strlen($literal) < 2 || !in_array($literal[0], ["'", '"'], true)) {
+            return null;
+        }
+        $value = substr($literal, 1, -1);
+        $value = "'" === $literal[0]
+            ? str_replace(['\\\\', "\\'"], ['\\', "'"], $value)
+            : stripcslashes($value);
+
+        return str_contains($value, "\0") ? null : $value;
+    }
+
+    /**
+     * @return array{allowedPaths: list<string>, outputPath: string, binaryPath: ?string}
+     */
+    private function tailwindRuntimePlan(ProjectLayout $layout): array
+    {
+        $settings = $this->tailwindSettings($layout);
+        $inputName = pathinfo(str_replace('\\', '/', $settings['inputCss']), PATHINFO_FILENAME);
+        if (1 !== preg_match('/\A[A-Za-z0-9._-]+\z/D', $inputName)) {
+            throw InstallerExecutionFailed::failed();
+        }
+
+        $outputPath = self::TAILWIND_RUNTIME_PREFIX.$inputName.'.built.css';
+        $allowedPaths = [$outputPath];
+        $binaryPath = null;
+        if (null === $settings['binary']) {
+            $version = $settings['binaryVersion'];
+            if (null === $version || 1 !== preg_match('/\Av[0-9]+\.[0-9]+\.[0-9]+\z/D', $version)) {
+                throw InstallerExecutionFailed::failed();
+            }
+            try {
+                $binaryName = TailwindBinary::getBinaryName(ltrim($version, 'v'), $settings['binaryPlatform']);
+            } catch (\Throwable) {
+                throw InstallerExecutionFailed::failed();
+            }
+            $binaryPath = self::TAILWIND_RUNTIME_PREFIX.$version.'/'.$binaryName;
+            $absoluteBinaryPath = $layout->path($binaryPath);
+            if (is_link($absoluteBinaryPath) || (file_exists($absoluteBinaryPath) && !is_file($absoluteBinaryPath))) {
+                throw InstallerExecutionFailed::failed();
+            }
+            if (!is_file($absoluteBinaryPath) || 0 === filesize($absoluteBinaryPath)) {
+                $allowedPaths[] = $binaryPath;
+            }
+        }
+
+        return [
+            'allowedPaths' => $allowedPaths,
+            'outputPath' => $outputPath,
+            'binaryPath' => $binaryPath,
+        ];
+    }
+
+    /** @param array{allowedPaths: list<string>, outputPath: string, binaryPath: ?string} $runtime */
+    private function validateTailwindRuntime(ProjectLayout $layout, array $runtime): void
+    {
+        foreach (array_filter([$runtime['outputPath'], $runtime['binaryPath']]) as $relativePath) {
+            $path = $layout->path($relativePath);
+            if (!is_file($path) || is_link($path) || 0 === filesize($path)) {
+                throw InstallerExecutionFailed::failed();
+            }
+        }
     }
 
     private function tailwindConfiguration(): string
@@ -366,7 +587,7 @@ final class InstallCommand extends Command
      * @param array<string, string> $manifestFiles
      * @param array<string, string> $renderedFiles
      */
-    private function manifestOwnsRenderedFiles(ProjectLayout $layout, array $manifestFiles, array $renderedFiles): bool
+    private function manifestOwnsRenderedFiles(array $manifestFiles, array $renderedFiles): bool
     {
         foreach ($renderedFiles as $relativePath => $contents) {
             $expected = hash('sha256', $contents);
@@ -375,25 +596,19 @@ final class InstallCommand extends Command
             }
         }
 
-        $ownedExternalPaths = [
-            'importmap.php',
-            'assets/vendor/shadcn/dist/tailwind.css',
-            'assets/vendor/tw-animate-css/dist/tw-animate.css',
-        ];
-        if (isset($manifestFiles[self::TAILWIND_CONFIG])) {
-            $ownedExternalPaths[] = self::TAILWIND_CONFIG;
-        }
+        return true;
+    }
 
-        foreach ($ownedExternalPaths as $relativePath) {
-            $path = $layout->path($relativePath);
-            $expected = $manifestFiles[$relativePath] ?? null;
-            $actual = is_file($path) && !is_link($path) ? hash_file('sha256', $path) : false;
-            if (!is_string($expected) || !is_string($actual) || !hash_equals($expected, $actual)) {
-                return false;
+    /** @param array<string, string> $manifestFiles */
+    private function manifestContainsTailwindRuntime(array $manifestFiles): bool
+    {
+        foreach (array_keys($manifestFiles) as $relativePath) {
+            if (str_starts_with($relativePath, self::TAILWIND_RUNTIME_PREFIX)) {
+                return true;
             }
         }
 
-        return true;
+        return false;
     }
 
     /**
@@ -403,6 +618,11 @@ final class InstallCommand extends Command
     private function finalManifest(ProjectLayout $layout, array $renderedFiles, array $externalPaths): \Te4g\UserBundle\Installer\InstallationManifest
     {
         $files = $this->manifestStore->load($layout)?->files() ?? [];
+        foreach (array_keys($files) as $relativePath) {
+            if (str_starts_with($relativePath, self::TAILWIND_RUNTIME_PREFIX)) {
+                unset($files[$relativePath]);
+            }
+        }
         $paths = array_values(array_unique([...array_keys($renderedFiles), ...$externalPaths]));
         foreach ($paths as $relativePath) {
             if (ManifestStore::RELATIVE_PATH === $relativePath) {
@@ -435,11 +655,12 @@ final class InstallCommand extends Command
         }
     }
 
+    /** @param list<string> $missingImportmapRequirements */
     private function printPlan(
         SymfonyStyle $io,
         InstallationPlan $plan,
         bool $tailwindConfigurationNeeded,
-        bool $importmapInstallationNeeded,
+        array $missingImportmapRequirements,
     ): void {
         $io->writeln('Installation plan:');
         foreach ($plan->files() as $file) {
@@ -451,8 +672,8 @@ final class InstallCommand extends Command
         if ($tailwindConfigurationNeeded) {
             $io->writeln('CONFIGURE Tailwind CSS v4.3.3');
         }
-        if ($importmapInstallationNeeded) {
-            $io->writeln('REQUIRE '.implode(' ', self::IMPORTMAP_PACKAGES));
+        if ([] !== $missingImportmapRequirements) {
+            $io->writeln('REQUIRE '.implode(' ', $missingImportmapRequirements));
         }
         $io->writeln('VALIDATE container, Tailwind, Twig, YAML, and offline icons');
         $io->writeln('GENERATE Doctrine migration for review');
