@@ -29,10 +29,16 @@ final class GeneratedShadcnKernel extends Kernel
 {
     use MicroKernelTrait;
 
+    private readonly string $projectDirectory;
+    private readonly string $tailwindBinary;
+
     public function __construct(
-        private readonly string $projectDirectory,
-        private readonly ?string $tailwindBinary,
+        string $projectDirectory,
+        ?string $tailwindBinary,
+        ?PinnedTailwindBinary $tailwindValidator = null,
     ) {
+        $this->projectDirectory = $projectDirectory;
+        $this->tailwindBinary = ($tailwindValidator ?? PinnedTailwindBinary::tailwind433())->validate($tailwindBinary);
         parent::__construct('test', false);
     }
 
@@ -120,11 +126,7 @@ final class GeneratedShadcnKernel extends Kernel
                 'strict_mode' => true,
                 'process_timeout' => 60,
             ];
-            if (null === $tailwindBinary) {
-                $tailwind['binary_version'] = '4.3.3';
-            } else {
-                $tailwind['binary'] = $tailwindBinary;
-            }
+            $tailwind['binary'] = $tailwindBinary;
             $container->loadFromExtension('symfonycasts_tailwind', $tailwind);
 
             $container->register(TailwindExtension::class, TailwindExtension::class)->addTag('twig.extension');

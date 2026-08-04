@@ -31,6 +31,7 @@ use Te4g\UserBundle\Installer\CssFragmentMerger;
 use Te4g\UserBundle\Installer\ProjectLayout;
 use Te4g\UserBundle\Installer\SkeletonRenderer;
 use Te4g\UserBundle\Tests\Fixtures\App\GeneratedShadcnKernel;
+use Te4g\UserBundle\Tests\Fixtures\App\PinnedTailwindBinary;
 use Te4g\UserBundle\Tests\Fixtures\Domain\TestAccountUser;
 use Twig\Environment;
 
@@ -47,6 +48,63 @@ final class GeneratedShadcnApplicationTest extends TestCase
     protected function tearDown(): void
     {
         (new Filesystem())->remove($this->projectDirectory);
+    }
+
+    public function testGeneratedFixtureRejectsMissingExplicitTailwindEnvironment(): void
+    {
+        $previous = getenv('TE4G_TAILWIND_BINARY');
+        putenv('TE4G_TAILWIND_BINARY');
+        try {
+            $failure = null;
+            try {
+                new GeneratedShadcnKernel($this->projectDirectory, $this->tailwindBinary());
+            } catch (\InvalidArgumentException $exception) {
+                $failure = $exception;
+            }
+        } finally {
+            if (is_string($previous)) {
+                putenv('TE4G_TAILWIND_BINARY='.$previous);
+            } else {
+                putenv('TE4G_TAILWIND_BINARY');
+            }
+        }
+
+        self::assertInstanceOf(\InvalidArgumentException::class, $failure);
+        self::assertStringContainsString('TE4G_TAILWIND_BINARY', $failure->getMessage());
+    }
+
+    public function testGeneratedKernelRejectsSymlinkedTailwindBinary(): void
+    {
+        $target = $this->writeExecutable('tailwind-target', '≈ tailwindcss v4.3.3');
+        $link = $this->projectDirectory.'/tailwind-link';
+        symlink($target, $link);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('symlink');
+
+        new GeneratedShadcnKernel($this->projectDirectory, $link);
+    }
+
+    public function testGeneratedKernelRejectsWrongTailwindVersion(): void
+    {
+        $binary = $this->writeExecutable('tailwind-wrong-version', '≈ tailwindcss v4.3.2');
+        $sha256 = hash_file('sha256', $binary);
+        self::assertIsString($sha256);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('4.3.3');
+
+        new GeneratedShadcnKernel($this->projectDirectory, $binary, new PinnedTailwindBinary('4.3.3', $sha256));
+    }
+
+    public function testGeneratedKernelRejectsWrongTailwindHash(): void
+    {
+        $binary = $this->writeExecutable('tailwind-wrong-hash', '≈ tailwindcss v4.3.3');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('SHA-256');
+
+        new GeneratedShadcnKernel($this->projectDirectory, $binary);
     }
 
     #[PreserveGlobalState(false)]
@@ -225,19 +283,8 @@ final class GeneratedShadcnApplicationTest extends TestCase
     private function tailwindBinary(): ?string
     {
         $configured = getenv('TE4G_TAILWIND_BINARY');
-        if (is_string($configured) && is_executable($configured)) {
-            return $configured;
-        }
 
-        foreach (array_unique([sys_get_temp_dir(), '/private/tmp']) as $temporaryDirectory) {
-            foreach (glob($temporaryDirectory.'/te4g-shadcn-upstream.*/var/tailwind/v4.3.3/tailwindcss-*') ?: [] as $candidate) {
-                if (is_executable($candidate)) {
-                    return $candidate;
-                }
-            }
-        }
-
-        return null;
+        return is_string($configured) ? $configured : null;
     }
 
     private function write(string $path, string $contents): void
@@ -247,6 +294,15 @@ final class GeneratedShadcnApplicationTest extends TestCase
             mkdir(dirname($target), 0777, true);
         }
         file_put_contents($target, $contents);
+    }
+
+    private function writeExecutable(string $path, string $versionOutput): string
+    {
+        $target = $this->projectDirectory.'/'.$path;
+        file_put_contents($target, "#!/bin/sh\nprintf '%s\\n' ".escapeshellarg($versionOutput)."\n");
+        chmod($target, 0755);
+
+        return $target;
     }
 
     private function xpathLiteral(string $value): string
