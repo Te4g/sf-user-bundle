@@ -15,6 +15,16 @@ final class RouteConflictScanner
     private const int MAX_TOTAL_BYTES = 64 * 1024 * 1024;
     private const int MAX_IMPORT_DEPTH = 32;
 
+    /** @var list<string> */
+    private const array TRUSTED_BUNDLE_ROUTE_RESOURCES = [
+        '@FrameworkBundle/Resources/config/routing/errors.php',
+        '@FrameworkBundle/Resources/config/routing/errors.xml',
+        '@WebProfilerBundle/Resources/config/routing/profiler.php',
+        '@WebProfilerBundle/Resources/config/routing/profiler.xml',
+        '@WebProfilerBundle/Resources/config/routing/wdt.php',
+        '@WebProfilerBundle/Resources/config/routing/wdt.xml',
+    ];
+
     private ProjectLayout $layout;
 
     /** @var array<string, true> */
@@ -220,6 +230,10 @@ final class RouteConflictScanner
         int $depth,
     ): void {
         if (str_starts_with($resource, '@')) {
+            if (!in_array($resource, self::TRUSTED_BUNDLE_ROUTE_RESOURCES, true)) {
+                $this->add($sourceRelativePath, 'uninspectable-route-resource');
+            }
+
             return;
         }
         if ('routing.controllers' === $resource) {
@@ -327,7 +341,9 @@ final class RouteConflictScanner
         }
 
         $imports = $this->routeAttributeImports($contents);
-        $routingVariables = $this->routingConfiguratorVariables($tokens, $imports);
+        $routing = $this->routingConfiguratorVariables($tokens, $imports);
+        $routingVariables = $routing['variables'];
+        $routingDeclarations = $routing['declarations'];
         $count = count($tokens);
         $curlyDepth = 0;
         for ($index = 0; $index < $count; ++$index) {
@@ -383,8 +399,13 @@ final class RouteConflictScanner
                 }
             }
             if (T_VARIABLE === $token->id && isset($routingVariables[$token->text])) {
+                if (isset($routingDeclarations[$index])) {
+                    continue;
+                }
                 $next = $this->nextSignificant($tokens, $index + 1);
-                if (null !== $next && '(' === $tokens[$next]->text) {
+                if (null === $next
+                    || (T_OBJECT_OPERATOR !== $tokens[$next]->id && '?->' !== $tokens[$next]->text)
+                ) {
                     $this->add($relativePath, 'uninspectable-route-configuration');
                 }
             }
@@ -545,11 +566,12 @@ final class RouteConflictScanner
      * @param list<\PhpToken>       $tokens
      * @param array<string, string> $imports
      *
-     * @return array<string, true>
+     * @return array{variables: array<string, true>, declarations: array<int, true>}
      */
     private function routingConfiguratorVariables(array $tokens, array $imports): array
     {
         $variables = ['$routes' => true];
+        $declarations = [];
         foreach ($tokens as $index => $token) {
             if (T_RETURN === $token->id) {
                 $function = $this->nextSignificant($tokens, $index + 1);
@@ -562,6 +584,13 @@ final class RouteConflictScanner
                     foreach ($call['arguments'][0] ?? [] as $parameterToken) {
                         if (T_VARIABLE === $parameterToken->id) {
                             $variables[$parameterToken->text] = true;
+                            foreach ($tokens as $parameterIndex => $candidate) {
+                                if ($candidate === $parameterToken) {
+                                    $declarations[$parameterIndex] = true;
+
+                                    break;
+                                }
+                            }
 
                             break;
                         }
@@ -583,10 +612,11 @@ final class RouteConflictScanner
                 'symfony\\component\\routing\\loader\\configurator\\collectionconfigurator',
             ], true)) {
                 $variables[$token->text] = true;
+                $declarations[$index] = true;
             }
         }
 
-        return $variables;
+        return ['variables' => $variables, 'declarations' => $declarations];
     }
 
     /**
@@ -595,16 +625,11 @@ final class RouteConflictScanner
      */
     private function receiverIsRoutingConfigurator(array $tokens, int $operator, array $routingVariables): bool
     {
-        for ($index = $operator - 1; $index >= 0; --$index) {
-            if (T_VARIABLE === $tokens[$index]->id) {
-                return isset($routingVariables[$tokens[$index]->text]);
-            }
-            if (in_array($tokens[$index]->text, [';', '{', '}'], true)) {
-                return false;
-            }
-        }
+        $receiver = $this->previousSignificant($tokens, $operator - 1);
 
-        return false;
+        return null !== $receiver
+            && T_VARIABLE === $tokens[$receiver]->id
+            && isset($routingVariables[$tokens[$receiver]->text]);
     }
 
     /** @param list<\PhpToken> $tokens */
@@ -843,21 +868,141 @@ final class RouteConflictScanner
     private function routeAttributeImports(string $contents): array
     {
         $imports = [];
-        if (!preg_match_all(
-            '~^\s*use\s+(\\\\?[A-Za-z_][A-Za-z0-9_]*(?:\\\\[A-Za-z_][A-Za-z0-9_]*)*)(?:\s+as\s+([A-Za-z_][A-Za-z0-9_]*))?\s*;~mi',
-            $contents,
-            $matches,
-            PREG_SET_ORDER,
-        )) {
+        try {
+            $tokens = array_values(\PhpToken::tokenize($contents, TOKEN_PARSE));
+        } catch (\Throwable) {
             return $imports;
         }
-        foreach ($matches as $match) {
-            $class = ltrim($match[1], '\\');
-            $alias = $match[2] ?? substr($class, (int) strrpos('\\'.$class, '\\'));
-            $imports[$alias] = $class;
+
+        $classDepths = [];
+        $depth = 0;
+        $pendingClass = false;
+        for ($index = 0, $count = count($tokens); $index < $count; ++$index) {
+            $token = $tokens[$index];
+            if (in_array($token->id, [T_CLASS, T_INTERFACE, T_TRAIT, T_ENUM], true)) {
+                $pendingClass = true;
+
+                continue;
+            }
+            if ('{' === $token->text) {
+                ++$depth;
+                if ($pendingClass) {
+                    $classDepths[] = $depth;
+                }
+                $pendingClass = false;
+
+                continue;
+            }
+            if ('}' === $token->text) {
+                if ([] !== $classDepths && $depth === $classDepths[array_key_last($classDepths)]) {
+                    array_pop($classDepths);
+                }
+                $depth = max(0, $depth - 1);
+
+                continue;
+            }
+            if (';' === $token->text) {
+                $pendingClass = false;
+            }
+            if (T_USE !== $token->id || [] !== $classDepths) {
+                continue;
+            }
+            $first = $this->nextSignificant($tokens, $index + 1);
+            if (null === $first || '(' === $tokens[$first]->text) {
+                continue;
+            }
+            $semicolon = $first;
+            while ($semicolon < $count && ';' !== $tokens[$semicolon]->text) {
+                ++$semicolon;
+            }
+            if ($semicolon >= $count) {
+                continue;
+            }
+
+            $statement = $this->significantTokens(array_slice($tokens, $first, $semicolon - $first));
+            $groupOpen = null;
+            foreach ($statement as $offset => $part) {
+                if ('{' === $part->text) {
+                    $groupOpen = $offset;
+
+                    break;
+                }
+            }
+            $prefix = '';
+            if (null !== $groupOpen) {
+                $prefix = $this->phpUseName(array_slice($statement, 0, $groupOpen));
+                if (null === $prefix
+                    || [] === $statement
+                    || '}' !== $statement[count($statement) - 1]->text
+                ) {
+                    $index = $semicolon;
+
+                    continue;
+                }
+                $members = $this->splitTopLevel(array_slice($statement, $groupOpen + 1, -1));
+            } else {
+                $members = $this->splitTopLevel($statement);
+            }
+
+            foreach ($members as $member) {
+                $member = $this->significantTokens($member);
+                if ([] === $member || in_array($member[0]->id, [T_FUNCTION, T_CONST], true)) {
+                    continue;
+                }
+                $as = null;
+                foreach ($member as $offset => $part) {
+                    if (T_AS === $part->id) {
+                        $as = $offset;
+
+                        break;
+                    }
+                }
+                $class = $this->phpUseName(array_slice($member, 0, $as ?? count($member)));
+                if (null === $class) {
+                    continue;
+                }
+                $class = '' === $prefix ? $class : $prefix.'\\'.$class;
+                $alias = substr($class, (int) strrpos('\\'.$class, '\\'));
+                if (null !== $as) {
+                    $aliasTokens = $this->significantTokens(array_slice($member, $as + 1));
+                    if (1 !== count($aliasTokens) || T_STRING !== $aliasTokens[0]->id) {
+                        continue;
+                    }
+                    $alias = $aliasTokens[0]->text;
+                }
+                $imports[$alias] = $class;
+            }
+            $index = $semicolon;
         }
 
         return $imports;
+    }
+
+    /** @param list<\PhpToken> $tokens */
+    private function phpUseName(array $tokens): ?string
+    {
+        $tokens = $this->significantTokens($tokens);
+        if ([] === $tokens || in_array($tokens[0]->id, [T_FUNCTION, T_CONST], true)) {
+            return null;
+        }
+
+        $name = '';
+        foreach ($tokens as $token) {
+            if (!in_array($token->id, [
+                T_STRING,
+                T_NAME_QUALIFIED,
+                T_NAME_FULLY_QUALIFIED,
+                T_NS_SEPARATOR,
+            ], true)) {
+                return null;
+            }
+            $name .= $token->text;
+        }
+        $name = trim($name, '\\');
+
+        return 1 === preg_match('/^[A-Za-z_][A-Za-z0-9_]*(?:\\\\[A-Za-z_][A-Za-z0-9_]*)*$/D', $name)
+            ? $name
+            : null;
     }
 
     /** @param array<string, string> $imports */
