@@ -73,13 +73,12 @@ final readonly class CssFragmentMerger
             return $stylesheet;
         }
 
-        $insertion = 0 === $preamble['insertion']
-            ? implode("\n", $missing)."\n\n"
-            : "\n".implode("\n", $missing);
+        $prefix = substr($stylesheet, 0, $preamble['insertion']);
+        $suffix = substr($stylesheet, $preamble['insertion']);
+        $before = '' === $prefix || preg_match('/\s\z/', $prefix) ? '' : "\n";
+        $after = '' === $suffix || preg_match('/\A\s/', $suffix) ? '' : "\n\n";
 
-        return substr($stylesheet, 0, $preamble['insertion'])
-            .$insertion
-            .substr($stylesheet, $preamble['insertion']);
+        return $prefix.$before.implode("\n", $missing).$after.$suffix;
     }
 
     /**
@@ -87,28 +86,11 @@ final readonly class CssFragmentMerger
      */
     private function parseImportPreamble(string $contents, bool $importsOnly): array
     {
-        $pattern = '~@import\s+(?:"(?<double>[^"]+)"|\'(?<single>[^\']+)\')(?<qualifiers>[^;]*);~';
-        $count = preg_match_all($pattern, $contents, $matches, PREG_SET_ORDER | PREG_OFFSET_CAPTURE);
-        if (false === $count || substr_count($contents, '@import') !== $count) {
-            throw InstallerConflict::invalidMarker();
-        }
-
+        $importPattern = '~\G@import\s+(?:"(?<double>[^"]+)"|\'(?<single>[^\']+)\')(?<qualifiers>[^;]*);~Ai';
         $imports = [];
         $seen = [];
-        $lastEnd = 0;
-        foreach ($matches as $match) {
-            $statement = $match[0][0];
-            $offset = $match[0][1];
-            $source = '' !== $match['double'][0] ? $match['double'][0] : $match['single'][0];
-            if (isset($seen[$source])) {
-                throw InstallerConflict::invalidMarker();
-            }
-            $seen[$source] = true;
-            $imports[] = ['source' => $source, 'statement' => $statement];
-            $lastEnd = $offset + strlen($statement);
-        }
-
         $cursor = 0;
+        $insertion = 0;
         $length = strlen($contents);
         while ($cursor < $length) {
             if (preg_match('/\G\s+/A', $contents, $whitespace, 0, $cursor)) {
@@ -118,16 +100,26 @@ final readonly class CssFragmentMerger
             }
             if (preg_match('~\G/\*.*?\*/~As', $contents, $comment, 0, $cursor)) {
                 $cursor += strlen($comment[0]);
+                $insertion = $cursor;
 
                 continue;
             }
             if (preg_match('/\G@charset\s+[^;]+;/Ai', $contents, $charset, 0, $cursor)) {
                 $cursor += strlen($charset[0]);
+                $insertion = $cursor;
 
                 continue;
             }
-            if (preg_match($pattern.'A', $contents, $import, 0, $cursor)) {
-                $cursor += strlen($import[0]);
+            if (preg_match($importPattern, $contents, $import, 0, $cursor)) {
+                $statement = $import[0];
+                $source = '' !== $import['double'] ? $import['double'] : $import['single'];
+                if (isset($seen[$source])) {
+                    throw InstallerConflict::invalidMarker();
+                }
+                $seen[$source] = true;
+                $imports[] = ['source' => $source, 'statement' => $statement];
+                $cursor += strlen($statement);
+                $insertion = $cursor;
 
                 continue;
             }
@@ -135,15 +127,64 @@ final readonly class CssFragmentMerger
             break;
         }
 
-        foreach ($matches as $match) {
-            if ($match[0][1] >= $cursor) {
-                throw InstallerConflict::invalidMarker();
-            }
+        if ($this->containsTopLevelImport($contents, $cursor)) {
+            throw InstallerConflict::invalidMarker();
         }
         if ($importsOnly && '' !== trim(substr($contents, $cursor))) {
             throw InstallerConflict::invalidMarker();
         }
 
-        return ['imports' => $imports, 'insertion' => 0 === $count ? $cursor : $lastEnd];
+        return ['imports' => $imports, 'insertion' => $insertion];
+    }
+
+    private function containsTopLevelImport(string $contents, int $cursor): bool
+    {
+        $length = strlen($contents);
+        $depth = 0;
+        $quote = null;
+        for (; $cursor < $length; ++$cursor) {
+            $character = $contents[$cursor];
+            if (null !== $quote) {
+                if ('\\' === $character) {
+                    ++$cursor;
+                } elseif ($quote === $character) {
+                    $quote = null;
+                }
+
+                continue;
+            }
+            if ('/' === $character && '*' === ($contents[$cursor + 1] ?? null)) {
+                $end = strpos($contents, '*/', $cursor + 2);
+                if (false === $end) {
+                    return false;
+                }
+                $cursor = $end + 1;
+
+                continue;
+            }
+            if ('"' === $character || "'" === $character) {
+                $quote = $character;
+
+                continue;
+            }
+            if ('{' === $character) {
+                ++$depth;
+
+                continue;
+            }
+            if ('}' === $character) {
+                $depth = max(0, $depth - 1);
+
+                continue;
+            }
+            if (0 === $depth && 0 === strncasecmp(substr($contents, $cursor, 7), '@import', 7)) {
+                $next = $contents[$cursor + 7] ?? '';
+                if ('' === $next || preg_match('/\s|["\'\(]/', $next)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 }

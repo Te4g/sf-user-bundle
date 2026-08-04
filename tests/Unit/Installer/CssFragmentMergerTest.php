@@ -73,6 +73,35 @@ final class CssFragmentMergerTest extends TestCase
         self::assertSame(1, substr_count($merged, ':root { --background: white; }'));
     }
 
+    public function testImportTextInsidePreambleCommentIsPreservedAndDoesNotSatisfyRequiredImport(): void
+    {
+        $application = <<<'CSS'
+            /* Documentation example: @import "tailwindcss"; */
+
+            .application { color: red; }
+
+            CSS;
+        $expected = <<<'CSS'
+            /* Documentation example: @import "tailwindcss"; */
+            @import "tailwindcss";
+            @import "../vendor/shadcn/dist/tailwind.css";
+            @import "../vendor/tw-animate-css/dist/tw-animate.css";
+
+            .application { color: red; }
+
+            /* <te4g-user name="shadcn"> */
+            :root { --background: white; }
+            /* </te4g-user> */
+
+            CSS;
+
+        $merged = (new CssFragmentMerger())->merge($application, self::FRAGMENT);
+
+        self::assertSame($expected, $merged);
+        self::assertSame(1, substr_count($merged, '/* Documentation example: @import "tailwindcss"; */'));
+        self::assertSame(1, substr_count($merged, "\n@import \"tailwindcss\";\n"));
+    }
+
     /** A malformed import or marker would make the Task 14 merge ambiguous. */
     #[DataProvider('conflictingStylesheets')]
     public function testMalformedDuplicateMarkersAndImportConflictsAreRejected(string $application): void
