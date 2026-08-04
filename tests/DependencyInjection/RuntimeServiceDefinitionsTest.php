@@ -9,6 +9,9 @@ use Symfony\Component\DependencyInjection\Argument\TaggedIteratorArgument;
 use Symfony\Component\DependencyInjection\Compiler\ResolveTaggedIteratorArgumentPass;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Reference;
+use Symfony\Component\HttpKernel\EventListener\RouterListener;
+use Symfony\Component\HttpKernel\KernelEvents;
+use Symfony\Component\Security\Http\Firewall;
 use Te4g\UserBundle\Contract\AccountDeletionGuardInterface;
 use Te4g\UserBundle\Contract\AccountMailerInterface;
 use Te4g\UserBundle\Controller\AccountRequestLimiter;
@@ -20,6 +23,7 @@ use Te4g\UserBundle\Manager\AccountDeletionManager;
 use Te4g\UserBundle\Manager\MagicLinkManager;
 use Te4g\UserBundle\Manager\ProfileManager;
 use Te4g\UserBundle\Security\AccountUserProvider;
+use Te4g\UserBundle\Security\LoginLinkCsrfSubscriber;
 use Te4g\UserBundle\Security\VerifiedAccountUserChecker;
 use Te4g\UserBundle\Tests\Fixtures\Domain\InMemoryAccountRepository;
 use Te4g\UserBundle\Tests\Fixtures\Domain\TestAccountUser;
@@ -39,6 +43,16 @@ final class RuntimeServiceDefinitionsTest extends TestCase
         self::assertTrue($container->hasDefinition(AccountUserProvider::class));
         self::assertSame('%te4g_user.user_class%', $container->getDefinition(AccountUserProvider::class)->getArgument('$userClass'));
         self::assertTrue($container->hasDefinition(VerifiedAccountUserChecker::class));
+        self::assertTrue($container->hasDefinition(LoginLinkCsrfSubscriber::class));
+        self::assertSame([[]], $container->getDefinition(LoginLinkCsrfSubscriber::class)->getTag('kernel.event_subscriber'));
+        $csrfListener = LoginLinkCsrfSubscriber::getSubscribedEvents()[KernelEvents::REQUEST];
+        $routerListener = RouterListener::getSubscribedEvents()[KernelEvents::REQUEST][0];
+        $firewallListener = Firewall::getSubscribedEvents()[KernelEvents::REQUEST];
+        self::assertSame(['onKernelRequest', 16], $csrfListener);
+        self::assertSame(['onKernelRequest', 32], $routerListener);
+        self::assertSame(['onKernelRequest', 8], $firewallListener);
+        self::assertGreaterThan($firewallListener[1], $csrfListener[1]);
+        self::assertLessThan($routerListener[1], $csrfListener[1]);
         self::assertTrue($container->hasDefinition(MagicLinkManager::class));
     }
 

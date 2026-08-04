@@ -36,6 +36,7 @@ use Te4g\UserBundle\Manager\PasswordResetManager;
 use Te4g\UserBundle\Manager\ProfileManager;
 use Te4g\UserBundle\Manager\RegistrationManager;
 use Te4g\UserBundle\Security\AccountUserProvider;
+use Te4g\UserBundle\Security\LoginLinkCsrfSubscriber;
 use Te4g\UserBundle\Security\VerifiedAccountUserChecker;
 use Te4g\UserBundle\Util\EmailNormalizer;
 
@@ -123,6 +124,9 @@ return static function (ContainerConfigurator $container): void {
         ->set(AccountUserProvider::class)
             ->autowire()
             ->arg('$userClass', '%te4g_user.user_class%')
+        ->set(LoginLinkCsrfSubscriber::class)
+            ->autowire()
+            ->tag('kernel.event_subscriber')
         ->set(VerifiedAccountUserChecker::class)
             ->autowire()
         ->alias(AccountRepositoryInterface::class, 'te4g_user.configured_account_repository')

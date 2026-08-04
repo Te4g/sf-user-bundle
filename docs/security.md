@@ -12,10 +12,12 @@ The generated security configuration exposes no detailed authentication errors. 
 | --- | --- | --- |
 | email verification | 3,600 seconds | signed link |
 | password reset | 3,600 seconds | persisted reset request; one-hour request throttle |
-| magic login | 600 seconds | ID/email/password signature properties, one use, used-link cache, POST-only completion |
+| magic login | 600 seconds | ID/email/password signature properties, one use, used-link cache, POST-only and CSRF-protected completion |
 | pending email change | signed workflow | current-password confirmation before request |
 
 Magic links make the email inbox an authentication factor. They are a convenience, not a substitute for step-up authentication or MFA in a security-critical application.
+
+The bundle validates the magic-link confirmation form's `_csrf_token` on the routed POST request before Symfony's native login-link authenticator runs. Missing or invalid tokens receive HTTP 403 and do not consume the signed link. CSRF tokens supplied only in the URL query are ignored; keep the bundle runtime subscriber enabled when customizing the login-link page.
 
 ## Password, email, session, and deletion behavior
 

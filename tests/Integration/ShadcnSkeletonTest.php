@@ -117,6 +117,9 @@ final class ShadcnSkeletonTest extends TestCase
         self::assertStringContainsString("csrf_token('authenticate')", $login);
         self::assertStringContainsString("path('te4g_user_login')", $login);
 
+        $loginLink = $rendered['templates/bundles/Te4gUserBundle/security/login_link_check.html.twig'];
+        self::assertStringContainsString("csrf_token('te4g_user_login_link_check')", $loginLink);
+
         $registration = $rendered['templates/bundles/Te4gUserBundle/registration/register.html.twig'];
         foreach (['form.email', 'form.plainPassword.first', 'form.plainPassword.second'] as $field) {
             self::assertStringContainsString($field, $registration);
