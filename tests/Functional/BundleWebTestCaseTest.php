@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Te4g\UserBundle\Tests\Functional;
 
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Security\Core\User\UserProviderInterface;
 use Te4g\UserBundle\Tests\Fixtures\Persistence\TestUser;
 use Te4g\UserBundle\Tests\Fixtures\Persistence\TestUserRepository;
@@ -35,5 +36,26 @@ final class BundleWebTestCaseTest extends BundleWebTestCase
         self::assertInstanceOf(UserProviderInterface::class, $provider);
 
         self::assertSame($user, $provider->loadUserByIdentifier('user@example.test'));
+    }
+
+    public function testSchemaResetRemovesStateFromAReusedDatabase(): void
+    {
+        $repository = self::getContainer()->get(TestUserRepository::class);
+        self::assertInstanceOf(TestUserRepository::class, $repository);
+        $user = new TestUser();
+        $user->setEmail('stale@example.test');
+        $repository->save($user);
+
+        $entityManager = self::getContainer()->get(EntityManagerInterface::class);
+        self::assertInstanceOf(EntityManagerInterface::class, $entityManager);
+        $failure = null;
+        try {
+            $this->resetSchema($entityManager);
+        } catch (\Throwable $exception) {
+            $failure = $exception;
+        }
+
+        self::assertNull($failure, $failure?->getMessage() ?? 'The reused database schema was reset.');
+        self::assertNull($repository->findOneByEmail('stale@example.test'));
     }
 }
