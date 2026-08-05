@@ -97,6 +97,15 @@ final class GeneratedShadcnApplicationTest extends TestCase
         new GeneratedShadcnKernel($this->projectDirectory, $binary, new PinnedTailwindBinary('4.3.3', $sha256));
     }
 
+    public function testPinnedTailwindValidationAcceptsAnsiDecoratedVersionOutput(): void
+    {
+        $binary = $this->writeExecutable('tailwind-ansi-version', "\033[3m\033[1m\033[34m≈\033[39m\033[22m\033[23m tailwindcss \033[34mv4.3.3\033[39m");
+        $sha256 = hash_file('sha256', $binary);
+        self::assertIsString($sha256);
+
+        self::assertSame($binary, (new PinnedTailwindBinary('4.3.3', $sha256))->validate($binary));
+    }
+
     public function testGeneratedKernelRejectsWrongTailwindHash(): void
     {
         $binary = $this->writeExecutable('tailwind-wrong-hash', '≈ tailwindcss v4.3.3');

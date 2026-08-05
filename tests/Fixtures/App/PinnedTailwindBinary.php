@@ -54,7 +54,8 @@ final readonly class PinnedTailwindBinary
         $process->setTimeout(10);
         $process->run();
         $output = $process->getOutput().$process->getErrorOutput();
-        if (!$process->isSuccessful() || !preg_match('/(?:\A|\R)≈ tailwindcss v'.preg_quote($this->expectedVersion, '/').'(?:\R|\z)/', $output)) {
+        $plainOutput = preg_replace('/\x1B\[[0-?]*[ -\/]*[@-~]/', '', $output);
+        if (!$process->isSuccessful() || null === $plainOutput || !preg_match('/(?:\A|\R)≈ tailwindcss v'.preg_quote($this->expectedVersion, '/').'(?:\R|\z)/', $plainOutput)) {
             throw new \InvalidArgumentException(sprintf('TE4G_TAILWIND_BINARY must report exactly Tailwind CSS %s.', $this->expectedVersion));
         }
 

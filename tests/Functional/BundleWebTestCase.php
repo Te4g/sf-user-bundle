@@ -20,7 +20,7 @@ abstract class BundleWebTestCase extends KernelTestCase
         $entityManager = self::getContainer()->get(EntityManagerInterface::class);
         self::assertInstanceOf(EntityManagerInterface::class, $entityManager);
 
-        (new SchemaTool($entityManager))->createSchema($entityManager->getMetadataFactory()->getAllMetadata());
+        $this->resetSchema($entityManager);
     }
 
     protected function tearDown(): void
@@ -34,5 +34,13 @@ abstract class BundleWebTestCase extends KernelTestCase
         }
 
         restore_exception_handler();
+    }
+
+    protected function resetSchema(EntityManagerInterface $entityManager): void
+    {
+        $metadata = $entityManager->getMetadataFactory()->getAllMetadata();
+        $schemaTool = new SchemaTool($entityManager);
+        $schemaTool->dropSchema($metadata);
+        $schemaTool->createSchema($metadata);
     }
 }
