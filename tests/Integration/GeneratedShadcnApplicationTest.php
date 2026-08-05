@@ -129,7 +129,9 @@ final class GeneratedShadcnApplicationTest extends TestCase
             $application->setAutoExit(false);
             $this->assertCommandSucceeds($application, 'lint:twig', ['filename' => [$this->projectDirectory.'/templates']]);
             $tailwindOutput = $this->assertCommandSucceeds($application, 'tailwind:build');
-            self::assertStringContainsString('tailwindcss v4.3.3', $tailwindOutput);
+            $plainTailwindOutput = preg_replace('/\x1B\[[0-?]*[ -\/]*[@-~]/', '', $tailwindOutput);
+            self::assertIsString($plainTailwindOutput);
+            self::assertStringContainsString('tailwindcss v4.3.3', $plainTailwindOutput);
             $iconsOutput = $this->assertCommandSucceeds($application, 'ux:icons:lock');
             self::assertStringContainsString('Imported 0 icons.', $iconsOutput);
 
