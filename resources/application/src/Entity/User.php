@@ -48,6 +48,9 @@ final class User implements PasswordAuthenticatedUserInterface, UserInterface
     #[ORM\Column(options: ['default' => false])]
     private bool $verified = false;
 
+    #[ORM\Column(length: 5, options: ['default' => 'en'])]
+    private string $locale = 'en';
+
     /** @return array<string, mixed> */
     public function __serialize(): array
     {
@@ -144,6 +147,18 @@ final class User implements PasswordAuthenticatedUserInterface, UserInterface
     public function setVerified(bool $verified): self
     {
         $this->verified = $verified;
+
+        return $this;
+    }
+
+    public function getLocale(): string
+    {
+        return $this->locale;
+    }
+
+    public function setLocale(string $locale): self
+    {
+        $this->locale = $locale;
 
         return $this;
     }

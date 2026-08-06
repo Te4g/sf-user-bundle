@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Account;
 
 use App\Entity\User;
+use App\Locale\SupportedLocales;
 use App\Repository\UserRepository;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -14,12 +15,13 @@ final readonly class RegistrationService
     public function __construct(
         private UserRepository $users,
         private EmailNormalizer $normalizer,
+        private SupportedLocales $locales,
         private UserPasswordHasherInterface $hasher,
         private EmailVerificationService $verification,
     ) {
     }
 
-    public function register(string $name, string $email, #[\SensitiveParameter] string $plainPassword): ?User
+    public function register(string $name, string $email, #[\SensitiveParameter] string $plainPassword, string $locale): ?User
     {
         $normalized = $this->normalizer->normalize($email);
         $existing = $this->users->findOneByNormalizedEmail($normalized);
@@ -35,6 +37,7 @@ final readonly class RegistrationService
         $user = (new User())
             ->setName(trim($name))
             ->setEmail($normalized)
+            ->setLocale($this->locales->supports($locale) ? $locale : $this->locales->default())
         ;
         $user->setPassword($this->hasher->hashPassword($user, $plainPassword));
 

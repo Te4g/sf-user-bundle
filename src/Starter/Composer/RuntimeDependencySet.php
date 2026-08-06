@@ -13,6 +13,7 @@ final class RuntimeDependencySet
             'doctrine/doctrine-bundle:^3.3',
             'doctrine/doctrine-migrations-bundle:^3.4 || ^4.0',
             'doctrine/orm:3.6.7',
+            'ext-intl:*',
             'ext-mbstring:*',
             'symfony/asset:^8.1',
             'symfony/asset-mapper:^8.1',

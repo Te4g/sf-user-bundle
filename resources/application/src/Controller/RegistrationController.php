@@ -32,7 +32,7 @@ final class RegistrationController extends AbstractController
 
         if ($form->isSubmitted() && $form->isValid()) {
             if ($this->requestLimiter->registration($request, $input->email)) {
-                $user = $this->registration->register($input->name, $input->email, $input->plainPassword);
+                $user = $this->registration->register($input->name, $input->email, $input->plainPassword, $request->getLocale());
                 if (null !== $user) {
                     $this->security->login($user, 'form_login', 'main');
                 }

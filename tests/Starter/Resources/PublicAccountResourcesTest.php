@@ -23,6 +23,27 @@ final class PublicAccountResourcesTest extends TestCase
         self::assertStringContainsString("redirectToRoute('app_check_email')", $controller);
     }
 
+    public function testRegistrationPersistsOnlySupportedRequestLocales(): void
+    {
+        $service = $this->resource('src/Account/RegistrationService.php');
+        $controller = $this->resource('src/Controller/RegistrationController.php');
+
+        self::assertStringContainsString('use App\\Locale\\SupportedLocales;', $service);
+        self::assertStringContainsString('private SupportedLocales $locales', $service);
+        self::assertStringContainsString(
+            'function register(string $name, string $email, #[\\SensitiveParameter] string $plainPassword, string $locale): ?User',
+            $service,
+        );
+        self::assertStringContainsString(
+            '->setLocale($this->locales->supports($locale) ? $locale : $this->locales->default())',
+            $service,
+        );
+        self::assertStringContainsString(
+            '$this->registration->register($input->name, $input->email, $input->plainPassword, $request->getLocale())',
+            $controller,
+        );
+    }
+
     public function testVerificationUsesTheSignedEmailHelperAndExactRoutes(): void
     {
         $service = $this->resource('src/Account/EmailVerificationService.php');

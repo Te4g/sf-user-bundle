@@ -1,0 +1,21 @@
+parameters:
+    app.name: 'Application'
+    app.supported_locales:
+        en: 'English'
+        fr: 'Français'
+
+framework:
+    default_locale: en
+    translator:
+        fallbacks: ['en']
+
+services:
+    App\Locale\SupportedLocales:
+        arguments:
+            $labels: '%app.supported_locales%'
+            $defaultLocale: '%kernel.default_locale%'
+
+twig:
+    globals:
+        app_name: '%app.name%'
+        supported_locales: '%app.supported_locales%'

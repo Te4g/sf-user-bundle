@@ -15,6 +15,7 @@ final class RuntimeDependencySetTest extends TestCase
             'doctrine/doctrine-bundle:^3.3',
             'doctrine/doctrine-migrations-bundle:^3.4 || ^4.0',
             'doctrine/orm:3.6.7',
+            'ext-intl:*',
             'ext-mbstring:*',
             'symfony/asset:^8.1',
             'symfony/asset-mapper:^8.1',
@@ -43,6 +44,7 @@ final class RuntimeDependencySetTest extends TestCase
             'symfony/maker-bundle:^1.64',
             'symfony/test-pack:^1.2',
         ], RuntimeDependencySet::development());
+        self::assertContains('ext-intl:*', RuntimeDependencySet::runtime());
         self::assertNotContains('te4g/starter', RuntimeDependencySet::runtime());
     }
 }

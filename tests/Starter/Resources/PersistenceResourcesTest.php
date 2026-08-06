@@ -51,7 +51,7 @@ final class PersistenceResourcesTest extends TestCase
     public function testUserAndRepositoryExposeDirectApplicationContracts(): void
     {
         $user = $this->resource('src/Entity/User.php');
-        foreach (['name', 'email', 'pendingEmail', 'roles', 'password', 'verified'] as $property) {
+        foreach (['name', 'email', 'pendingEmail', 'roles', 'password', 'verified', 'locale'] as $property) {
             self::assertMatchesRegularExpression('/private [^;]+ \\$'.preg_quote($property, '/').'\\b/', $user);
         }
 
@@ -61,6 +61,7 @@ final class PersistenceResourcesTest extends TestCase
             'setPendingEmail(?string $email): self',
             'setPassword(string $password): self',
             'setVerified(bool $verified): self',
+            'setLocale(string $locale): self',
         ] as $signature) {
             self::assertStringContainsString($signature, $user);
         }
@@ -138,6 +139,11 @@ final class PersistenceResourcesTest extends TestCase
         );
         $userClass = $this->applicationClass('Entity\\User');
         $metadata = $entityManager->getClassMetadata($userClass);
+        self::assertTrue($metadata->hasField('locale'));
+        $localeMapping = $metadata->getFieldMapping('locale');
+        self::assertSame('string', $localeMapping->type);
+        self::assertSame(5, $localeMapping->length);
+        self::assertSame(['default' => 'en'], $localeMapping->options);
         (new SchemaTool($entityManager))->createSchema([$metadata]);
 
         $registry = $this->createStub(ManagerRegistry::class);
