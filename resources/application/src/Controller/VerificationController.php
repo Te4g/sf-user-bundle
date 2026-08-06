@@ -29,9 +29,13 @@ final class VerificationController extends AbstractController
     #[Route('/check-email', name: 'app_check_email', methods: ['GET'])]
     public function checkEmail(): Response
     {
-        return $this->render('security/check_email.html.twig', [
-            'resend_form' => $this->emailForm('app_verify_resend')->createView(),
-        ]);
+        $context = [];
+        $user = $this->getUser();
+        if ($user instanceof User && !$user->isVerified()) {
+            $context['resend_form'] = $this->emailForm('app_verify_resend')->createView();
+        }
+
+        return $this->render('security/check_email.html.twig', $context);
     }
 
     #[Route('/verify/email', name: 'app_verify_email', methods: ['GET'])]
@@ -81,6 +85,7 @@ final class VerificationController extends AbstractController
             'action' => $this->generateUrl($routeName),
             'method' => Request::METHOD_POST,
         ])->add('email', EmailType::class, [
+            'label' => 'form.email',
             'attr' => ['autocomplete' => 'email'],
             'constraints' => [new Assert\NotBlank(), new Assert\Email()],
         ])->getForm();

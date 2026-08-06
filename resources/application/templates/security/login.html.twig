@@ -19,6 +19,7 @@
                         <twig:Button type="button" variant="ghost" size="sm" class="absolute right-1 top-1" aria-pressed="false" data-password-visibility-target="button" data-action="click->password-visibility#toggle"><twig:ux:icon name="lucide:eye" /><span data-password-visibility-target="label">{{ 'password.show'|trans }}</span></twig:Button>
                     </div>
                 </twig:Field>
+                <div class="text-right"><twig:Button as="a" href="{{ path('app_forgot_password_request') }}" variant="link" class="h-auto px-0">{{ 'login.forgot_password'|trans }}</twig:Button></div>
                 <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
                 <twig:Button type="submit" class="w-full" data-turbo-submits-with="{{ 'form.submitting'|trans }}"><twig:Spinner class="hidden" label="{{ 'form.submitting'|trans }}" />{{ 'login.submit'|trans }}</twig:Button>
             </form>
@@ -30,7 +31,7 @@
                 {% endif %}
                 <twig:Field>
                     <twig:Field:Label for="{{ magic_link_form.email.vars.id }}" class="{{ magic_link_form.email.vars.required ? 'required' : '' }}">{{ magic_link_form.email.vars.label|trans(magic_link_form.email.vars.label_translation_parameters, magic_link_form.email.vars.translation_domain) }}</twig:Field:Label>
-                    {{ form_widget(magic_link_form.email, {attr: {'aria-describedby': 'email_email_errors'}}) }}
+                    {{ form_widget(magic_link_form.email, {attr: {'aria-describedby': magic_link_form.email.vars.id ~ '_errors'}}) }}
                     {{ form_errors(magic_link_form.email) }}
                 </twig:Field>
                 {{ form_rest(magic_link_form) }}

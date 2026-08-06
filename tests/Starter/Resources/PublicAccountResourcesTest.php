@@ -37,6 +37,18 @@ final class PublicAccountResourcesTest extends TestCase
         self::assertStringContainsString('verificationResend($request, $email)', $controller);
     }
 
+    public function testCheckEmailOnlyOffersVerificationResendToAuthenticatedUnverifiedUsers(): void
+    {
+        $controller = $this->resource('src/Controller/VerificationController.php');
+        $template = $this->resource('templates/security/check_email.html.twig');
+
+        self::assertStringContainsString('$user = $this->getUser();', $controller);
+        self::assertStringContainsString('$user instanceof User && !$user->isVerified()', $controller);
+        self::assertStringContainsString("\$context['resend_form']", $controller);
+        self::assertStringContainsString("path('app_login')", $template);
+        self::assertStringContainsString('{% if resend_form is defined %}', $template);
+    }
+
     public function testMagicLinkDelegatesAuthenticationAndVerifiesTheDestination(): void
     {
         $service = $this->resource('src/Account/MagicLinkService.php');

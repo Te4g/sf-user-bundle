@@ -18,8 +18,14 @@ final class ResetPasswordType extends AbstractType
         $builder->add('plainPassword', RepeatedType::class, [
             'type' => PasswordType::class,
             'invalid_message' => 'The password fields must match.',
-            'first_options' => ['attr' => ['autocomplete' => 'new-password']],
-            'second_options' => ['attr' => ['autocomplete' => 'new-password']],
+            'first_options' => [
+                'label' => 'form.password',
+                'attr' => ['autocomplete' => 'new-password'],
+            ],
+            'second_options' => [
+                'label' => 'form.password_confirmation',
+                'attr' => ['autocomplete' => 'new-password'],
+            ],
         ]);
     }
 

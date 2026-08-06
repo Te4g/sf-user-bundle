@@ -80,6 +80,7 @@ final class PasswordResetController extends AbstractController
     {
         return $this->createFormBuilder(['email' => ''])
             ->add('email', EmailType::class, [
+                'label' => 'form.email',
                 'attr' => ['autocomplete' => 'email'],
                 'constraints' => [new Assert\NotBlank(), new Assert\Email()],
             ])

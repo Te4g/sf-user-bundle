@@ -9,8 +9,8 @@ final class ShadcnSnapshotSynchronizer
     private const array ADAPTATIONS = [
         'assets/controllers/alert_dialog_controller.js' => [
             'before' => 'dc00ecf727a6ac410d4cfc77ac719cacfbdce3d2ffeb20cffbaa06080e113d3b',
-            'after' => '690edb84bfa9c2da1cf4d91388de7e80a8ba2036af50d0d969bb8e5eb924632d',
-            'description' => 'Submit the existing deletion form, restore focus, and close safely on Turbo disconnect.',
+            'after' => 'cfa4b2554ac343e5474c93d840f2c54336f835b3e6df83ef276f27f598f36b57',
+            'description' => 'Close before native validation submits the existing deletion form, restore focus, and close safely on Turbo disconnect.',
             'transform' => 'adaptAlertDialogController',
         ],
         'templates/components/AlertDialog.html.twig' => [
@@ -314,6 +314,7 @@ final class ShadcnSnapshotSynchronizer
                 }
 
                 submit() {
+                    this.close();
                     this.formTarget.requestSubmit();
                 }
             }

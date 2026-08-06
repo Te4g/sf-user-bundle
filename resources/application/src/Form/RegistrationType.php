@@ -18,13 +18,25 @@ final class RegistrationType extends AbstractType
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $builder
-            ->add('name', TextType::class, ['attr' => ['autocomplete' => 'name']])
-            ->add('email', EmailType::class, ['attr' => ['autocomplete' => 'email']])
+            ->add('name', TextType::class, [
+                'label' => 'form.name',
+                'attr' => ['autocomplete' => 'name'],
+            ])
+            ->add('email', EmailType::class, [
+                'label' => 'form.email',
+                'attr' => ['autocomplete' => 'email'],
+            ])
             ->add('plainPassword', RepeatedType::class, [
                 'type' => PasswordType::class,
                 'invalid_message' => 'The password fields must match.',
-                'first_options' => ['attr' => ['autocomplete' => 'new-password']],
-                'second_options' => ['attr' => ['autocomplete' => 'new-password']],
+                'first_options' => [
+                    'label' => 'form.password',
+                    'attr' => ['autocomplete' => 'new-password'],
+                ],
+                'second_options' => [
+                    'label' => 'form.password_confirmation',
+                    'attr' => ['autocomplete' => 'new-password'],
+                ],
             ])
         ;
     }

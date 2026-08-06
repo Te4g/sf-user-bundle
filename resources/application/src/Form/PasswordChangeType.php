@@ -17,13 +17,20 @@ final class PasswordChangeType extends AbstractType
     {
         $builder
             ->add('currentPassword', PasswordType::class, [
+                'label' => 'form.current_password',
                 'attr' => ['autocomplete' => 'current-password'],
             ])
             ->add('plainPassword', RepeatedType::class, [
                 'type' => PasswordType::class,
                 'invalid_message' => 'The password fields must match.',
-                'first_options' => ['attr' => ['autocomplete' => 'new-password']],
-                'second_options' => ['attr' => ['autocomplete' => 'new-password']],
+                'first_options' => [
+                    'label' => 'form.new_password',
+                    'attr' => ['autocomplete' => 'new-password'],
+                ],
+                'second_options' => [
+                    'label' => 'form.password_confirmation',
+                    'attr' => ['autocomplete' => 'new-password'],
+                ],
             ])
         ;
     }

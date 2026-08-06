@@ -37,8 +37,8 @@
             "path": "assets/controllers/alert_dialog_controller.js",
             "source": "symfony/ux-toolkit:shadcn/alert-dialog",
             "license": "MIT",
-            "sha256": "690edb84bfa9c2da1cf4d91388de7e80a8ba2036af50d0d969bb8e5eb924632d",
-            "local_modification": "Submit the existing deletion form, restore focus, and close safely on Turbo disconnect."
+            "sha256": "cfa4b2554ac343e5474c93d840f2c54336f835b3e6df83ef276f27f598f36b57",
+            "local_modification": "Close before native validation submits the existing deletion form, restore focus, and close safely on Turbo disconnect."
         },
         {
             "path": "assets/icons/lucide/circle-check.svg",

@@ -16,8 +16,14 @@ final class ProfileType extends AbstractType
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $builder
-            ->add('name', TextType::class, ['attr' => ['autocomplete' => 'name']])
-            ->add('email', EmailType::class, ['attr' => ['autocomplete' => 'email']])
+            ->add('name', TextType::class, [
+                'label' => 'form.name',
+                'attr' => ['autocomplete' => 'name'],
+            ])
+            ->add('email', EmailType::class, [
+                'label' => 'form.email',
+                'attr' => ['autocomplete' => 'email'],
+            ])
         ;
     }
 

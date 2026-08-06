@@ -17,9 +17,12 @@ final class DeleteAccountType extends AbstractType
     {
         $builder
             ->add('currentPassword', PasswordType::class, [
+                'label' => 'form.current_password',
                 'attr' => ['autocomplete' => 'current-password'],
             ])
-            ->add('confirm', CheckboxType::class)
+            ->add('confirm', CheckboxType::class, [
+                'label' => 'form.delete_confirmation',
+            ])
         ;
     }
 
