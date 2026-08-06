@@ -1,0 +1,25 @@
+framework:
+    cache:
+        pools:
+            cache.account_test_rate_limiter:
+                adapter: cache.adapter.array
+    rate_limiter:
+        account_login:
+            cache_pool: cache.account_test_rate_limiter
+        account_registration:
+            cache_pool: cache.account_test_rate_limiter
+        account_magic_link:
+            cache_pool: cache.account_test_rate_limiter
+        account_password_reset:
+            cache_pool: cache.account_test_rate_limiter
+        account_verification_resend:
+            cache_pool: cache.account_test_rate_limiter
+        account_email_change:
+            cache_pool: cache.account_test_rate_limiter
+
+services:
+    App\Tests\Functional\ObservableTestLogger:
+        public: true
+    logger:
+        alias: App\Tests\Functional\ObservableTestLogger
+        public: true

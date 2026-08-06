@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional;
 
+use App\Entity\ResetPasswordRequest;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
+use SymfonyCasts\Bundle\ResetPassword\ResetPasswordHelperInterface;
 
 final class SecurityBoundaryTest extends AccountWebTestCase
 {
@@ -55,7 +58,10 @@ final class SecurityBoundaryTest extends AccountWebTestCase
             'app_account_password' => [
                 'password_change' => [
                     'currentPassword' => 'password',
-                    'plainPassword' => ['first' => 'new-password', 'second' => 'new-password'],
+                    'plainPassword' => [
+                        'first' => 'Correct Horse Battery Staple 42!',
+                        'second' => 'Correct Horse Battery Staple 42!',
+                    ],
                     '_token' => 'invalid',
                 ],
             ],
@@ -69,6 +75,30 @@ final class SecurityBoundaryTest extends AccountWebTestCase
 
         $this->client->request('POST', $this->url('app_logout'), ['_csrf_token' => 'invalid']);
         self::assertResponseStatusCodeSame(403);
+    }
+
+    public function testResetFormRejectsInvalidCsrfWithoutConsumingTheToken(): void
+    {
+        $user = $this->createUser('reset-csrf@example.com', true, 'old-password');
+        $resetHelper = static::getContainer()->get(ResetPasswordHelperInterface::class);
+        self::assertInstanceOf(ResetPasswordHelperInterface::class, $resetHelper);
+        $token = $resetHelper->generateResetToken($user)->getToken();
+
+        $this->client->request('POST', $this->url('app_forgot_password_reset', ['token' => $token]), [
+            'reset_password' => [
+                'plainPassword' => [
+                    'first' => 'Correct Horse Battery Staple 42!',
+                    'second' => 'Correct Horse Battery Staple 42!',
+                ],
+                '_token' => 'invalid',
+            ],
+        ]);
+
+        self::assertResponseStatusCodeSame(422);
+        $hasher = static::getContainer()->get(UserPasswordHasherInterface::class);
+        self::assertInstanceOf(UserPasswordHasherInterface::class, $hasher);
+        self::assertTrue($hasher->isPasswordValid($this->refreshUser($user), 'old-password'));
+        self::assertSame(1, $this->entityManager()->getRepository(ResetPasswordRequest::class)->count([]));
     }
 
     public function testEveryConfiguredAccountLimiterAcceptsFiveAttemptsAndRejectsTheSixth(): void
@@ -91,6 +121,47 @@ final class SecurityBoundaryTest extends AccountWebTestCase
 
             self::assertFalse($limiter->consume()->isAccepted(), $name.' attempt 6');
         }
+    }
+
+    public function testLimiterStateAccumulatesInsideAKernelAndResetsWithAFreshKernel(): void
+    {
+        $key = 'task-10-repeat-run-isolation';
+        $factory = static::getContainer()->get('limiter.account_registration');
+        self::assertInstanceOf(RateLimiterFactoryInterface::class, $factory);
+        $limiter = $factory->create($key);
+
+        for ($attempt = 1; $attempt <= 5; ++$attempt) {
+            self::assertTrue($limiter->consume()->isAccepted());
+        }
+        self::assertFalse($limiter->consume()->isAccepted());
+
+        static::ensureKernelShutdown();
+        $this->client = static::createClient();
+        $freshFactory = static::getContainer()->get('limiter.account_registration');
+        self::assertInstanceOf(RateLimiterFactoryInterface::class, $freshFactory);
+        self::assertTrue($freshFactory->create($key)->consume()->isAccepted());
+    }
+
+    public function testMagicLinkEndpointLimiterAccumulatesAcrossRequestsWithoutKernelReboot(): void
+    {
+        $this->createUser('endpoint-limit@example.com');
+        $this->client->disableReboot();
+
+        for ($attempt = 1; $attempt <= 5; ++$attempt) {
+            $crawler = $this->client->request('GET', $this->url('app_login'));
+            $this->client->submit($crawler->filter('form[action="'.$this->url('app_login_link_request').'"]')->form([
+                'form[email]' => 'endpoint-limit@example.com',
+            ]));
+            self::assertResponseRedirects($this->url('app_check_email'));
+            self::assertEmailCount($attempt);
+        }
+
+        $crawler = $this->client->request('GET', $this->url('app_login'));
+        $this->client->submit($crawler->filter('form[action="'.$this->url('app_login_link_request').'"]')->form([
+            'form[email]' => 'endpoint-limit@example.com',
+        ]));
+        self::assertResponseRedirects($this->url('app_check_email'));
+        self::assertEmailCount(5);
     }
 
     public function testEmailAddressSubmissionEndpointsHaveNeutralKnownAndUnknownResponses(): void
@@ -162,8 +233,47 @@ final class SecurityBoundaryTest extends AccountWebTestCase
         self::assertStringNotContainsString($currentPasswordSecret, $response);
         self::assertStringNotContainsString($newPasswordSecret, $response);
 
+        $resetPasswordSecret = 'Correct Reset Password 42! '.bin2hex(random_bytes(8));
+        $resetUser = $this->createUser('secret-reset@example.com', true, 'old-reset-password');
+        $resetHelper = static::getContainer()->get(ResetPasswordHelperInterface::class);
+        self::assertInstanceOf(ResetPasswordHelperInterface::class, $resetHelper);
+        $resetToken = $resetHelper->generateResetToken($resetUser)->getToken();
+        $crawler = $this->client->request('GET', $this->url('app_forgot_password_reset', ['token' => $resetToken]));
+        $this->client->submit($crawler->filter('form[name="reset_password"]')->form([
+            'reset_password[plainPassword][first]' => $resetPasswordSecret,
+            'reset_password[plainPassword][second]' => $resetPasswordSecret,
+        ]));
+        self::assertResponseRedirects($this->url('app_login'));
+        self::assertStringNotContainsString($resetPasswordSecret, (string) $this->client->getResponse()->getContent());
+        $hasher = static::getContainer()->get(UserPasswordHasherInterface::class);
+        self::assertInstanceOf(UserPasswordHasherInterface::class, $hasher);
+        self::assertTrue($hasher->isPasswordValid($this->refreshUser($resetUser), $resetPasswordSecret));
+
+        $deletionPasswordSecret = 'Correct Deletion Password 42! '.bin2hex(random_bytes(8));
+        $deletionUser = $this->createUser('secret-deletion@example.com', true, $deletionPasswordSecret);
+        $this->client->loginUser($deletionUser);
+        $crawler = $this->client->request('GET', $this->url('app_account_delete'));
+        $this->client->submit($crawler->filter('form[name="delete_account"]')->form([
+            'delete_account[currentPassword]' => $deletionPasswordSecret,
+            'delete_account[confirm]' => '1',
+        ]));
+        self::assertResponseRedirects($this->url('app_home'));
+        self::assertStringNotContainsString($deletionPasswordSecret, (string) $this->client->getResponse()->getContent());
+        self::assertNull($this->user('secret-deletion@example.com'));
+
         $logs = $this->applicationLogs();
-        foreach ([$registrationSecret, $loginSecret, $currentPasswordSecret, $newPasswordSecret] as $secret) {
+        self::assertGreaterThan(0, ObservableTestLogger::count());
+        self::assertStringContainsString('Matched route "{route}".', $logs);
+        self::assertStringContainsString('app_login', $logs);
+        self::assertStringContainsString('Authenticator failed.', $logs);
+        foreach ([
+            $registrationSecret,
+            $loginSecret,
+            $currentPasswordSecret,
+            $newPasswordSecret,
+            $resetPasswordSecret,
+            $deletionPasswordSecret,
+        ] as $secret) {
             self::assertStringNotContainsString($secret, $logs);
         }
     }

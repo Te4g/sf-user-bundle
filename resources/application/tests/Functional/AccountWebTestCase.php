@@ -8,10 +8,10 @@ use App\Entity\ResetPasswordRequest;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\Mime\Email;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
@@ -25,6 +25,7 @@ abstract class AccountWebTestCase extends WebTestCase
     {
         parent::setUp();
 
+        ObservableTestLogger::clear();
         $this->client = static::createClient();
         $entityManager = $this->entityManager();
         $entityManager->createQuery('DELETE FROM '.ResetPasswordRequest::class)->execute();
@@ -78,11 +79,9 @@ abstract class AccountWebTestCase extends WebTestCase
     protected function emailLink(int $index = 0): string
     {
         $email = self::getMailerMessage($index);
-        self::assertInstanceOf(TemplatedEmail::class, $email);
-        $url = $email->getContext()['absolute_url'] ?? null;
-        self::assertIsString($url);
+        self::assertInstanceOf(Email::class, $email);
 
-        return $url;
+        return EmailLinkExtractor::from($email, 'localhost', 'http');
     }
 
     /** @param array<string, scalar> $parameters */
@@ -137,18 +136,8 @@ abstract class AccountWebTestCase extends WebTestCase
 
     protected function applicationLogs(): string
     {
-        $projectDirectory = static::getContainer()->getParameter('kernel.project_dir');
-        self::assertIsString($projectDirectory);
-        $logs = glob($projectDirectory.'/var/log/*.log');
-        self::assertIsArray($logs);
+        self::assertGreaterThan(0, ObservableTestLogger::count(), 'The test logger did not observe an application or security log entry.');
 
-        $contents = '';
-        foreach ($logs as $log) {
-            $entry = file_get_contents($log);
-            self::assertIsString($entry);
-            $contents .= $entry;
-        }
-
-        return $contents;
+        return ObservableTestLogger::contents();
     }
 }
