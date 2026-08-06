@@ -64,6 +64,85 @@ final class StagedFileWriterTest extends TestCase
         self::assertFileExists($this->layout()->path('src/Entity/User.php'));
     }
 
+    public function testPlannedCreateRefusesACustomFileIntroducedBeforeWriting(): void
+    {
+        $layout = $this->layout();
+        $plan = $this->planForResource('src/Example.php', '<?php final class GeneratedExample {}');
+        $target = $layout->path('src/Example.php');
+        self::assertTrue(mkdir(dirname($target), 0700, true));
+        self::assertNotFalse(file_put_contents($target, '<?php final class CustomExample {}'));
+
+        $this->expectException(GenerationFailed::class);
+        $this->expectExceptionMessage('src/Example.php: planned create target changed');
+
+        try {
+            $this->writer()->write($layout, $plan);
+        } finally {
+            self::assertSame('<?php final class CustomExample {}', file_get_contents($target));
+        }
+    }
+
+    public function testPlannedCreateRefusesASymlinkIntroducedBeforeWriting(): void
+    {
+        $layout = $this->layout();
+        $plan = $this->planForResource('src/Example.php', '<?php final class GeneratedExample {}');
+        $target = $layout->path('src/Example.php');
+        self::assertTrue(mkdir(dirname($target), 0700, true));
+        self::assertTrue(symlink('../composer.json', $target));
+
+        $this->expectException(GenerationFailed::class);
+        $this->expectExceptionMessage('src/Example.php: planned create target changed');
+
+        try {
+            $this->writer()->write($layout, $plan);
+        } finally {
+            self::assertSame('{}', file_get_contents($layout->path('composer.json')));
+            self::assertTrue(is_link($target));
+        }
+    }
+
+    public function testPlannedReplacementRefusesContentChangedBeforeWriting(): void
+    {
+        $layout = $this->layout();
+        $target = $layout->path('config/packages/security.yaml');
+        self::assertTrue(mkdir(dirname($target), 0700, true));
+        self::assertNotFalse(file_put_contents($target, 'fresh baseline'));
+        $source = $this->temporaryDirectory.'/replacement';
+        self::assertNotFalse(file_put_contents($source, 'generated security'));
+        $plan = new GenerationPlan([
+            PlannedResource::replace('config/packages/security.yaml', $source, 'fresh baseline'),
+        ], []);
+        self::assertNotFalse(file_put_contents($target, 'customized security'));
+
+        $this->expectException(GenerationFailed::class);
+        $this->expectExceptionMessage('config/packages/security.yaml: planned replacement target changed');
+
+        try {
+            $this->writer()->write($layout, $plan);
+        } finally {
+            self::assertSame('customized security', file_get_contents($target));
+        }
+    }
+
+    public function testCleanupUnlinksASwappedStagingRootWithoutTraversingOutsideDirectory(): void
+    {
+        $staging = $this->temporaryDirectory.'/staging';
+        $outside = $this->temporaryDirectory.'/outside';
+        self::assertTrue(mkdir($staging, 0700, true));
+        self::assertTrue(mkdir($outside, 0700, true));
+        self::assertNotFalse(file_put_contents($outside.'/keep.txt', 'keep'));
+        $identity = lstat($staging);
+        self::assertIsArray($identity);
+        self::assertTrue(rename($staging, $this->temporaryDirectory.'/former-staging'));
+        self::assertTrue(symlink($outside, $staging));
+
+        $method = new \ReflectionMethod(StagedFileWriter::class, 'removeTemporaryDirectory');
+        $method->invoke($this->writer(), $staging, $identity);
+
+        self::assertFileExists($outside.'/keep.txt');
+        self::assertFileDoesNotExist($staging);
+    }
+
     /** @return iterable<string, array{string, string}> */
     public static function invalidStaticResourceProvider(): iterable
     {

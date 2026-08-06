@@ -60,7 +60,7 @@ final readonly class ReplacementPolicy
                 continue;
             }
 
-            $writes[] = PlannedResource::replace($relativePath, $sourcePath);
+            $writes[] = PlannedResource::replace($relativePath, $sourcePath, $existing);
         }
 
         return new GenerationPlan($writes, $conflicts);
