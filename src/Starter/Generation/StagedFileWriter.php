@@ -83,7 +83,7 @@ final readonly class StagedFileWriter
     private function createTarget(string $source, string $target, string $relativePath): void
     {
         $directory = dirname($target);
-        if (!is_dir($directory) && !mkdir($directory, 0700, true)) {
+        if (!is_dir($directory) && !mkdir($directory, 0755, true)) {
             throw GenerationFailed::cannotWrite($target);
         }
 

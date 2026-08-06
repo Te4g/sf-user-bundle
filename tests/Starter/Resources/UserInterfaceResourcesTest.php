@@ -136,6 +136,27 @@ final class UserInterfaceResourcesTest extends TestCase
         self::assertStringContainsString('resources/application/assets/icons/lucide/', $notices);
     }
 
+    public function testGeneratedApplicationRetainsScopedLicenseAndThirdPartyNotices(): void
+    {
+        $files = (new ResourceCatalog($this->applicationResources()))->files();
+        self::assertArrayHasKey('STARTER_LICENSES.md', $files);
+
+        $notices = $this->resource('STARTER_LICENSES.md');
+        self::assertStringContainsString('GPL-3.0-only', $notices);
+        self::assertStringContainsString('files copied by `te4g/starter`', $notices);
+        self::assertStringContainsString('independently authored application', $notices);
+        self::assertStringContainsString('code that was not copied from the starter', $notices);
+        self::assertStringContainsString('GNU GENERAL PUBLIC LICENSE', $notices);
+        self::assertStringContainsString('END OF TERMS AND CONDITIONS', $notices);
+        self::assertStringContainsString('Copyright (c) 2025-present Fabien Potencier', $notices);
+        self::assertStringContainsString('Copyright (c) 2026 Lucide Icons and Contributors', $notices);
+        self::assertStringContainsString('Copyright (c) 2013-present Cole Bemis', $notices);
+        self::assertStringContainsString('templates/components/', $notices);
+        self::assertStringContainsString('assets/controllers/alert_dialog_controller.js', $notices);
+        self::assertStringContainsString('assets/icons/lucide/', $notices);
+        self::assertStringNotContainsString('resources/application/', $notices);
+    }
+
     public function testTemplatesMatchOptionalControllerContextUnderStrictVariables(): void
     {
         $checkEmail = $this->resource('templates/security/check_email.html.twig');

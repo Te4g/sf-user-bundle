@@ -8,6 +8,7 @@ use App\Entity\User;
 use App\Mailer\AccountMailer;
 use App\Repository\ResetPasswordRequestRepository;
 use App\Repository\UserRepository;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use SymfonyCasts\Bundle\ResetPassword\Exception\ResetPasswordExceptionInterface;
@@ -23,6 +24,7 @@ final readonly class PasswordResetService
         private UserPasswordHasherInterface $hasher,
         private UrlGeneratorInterface $urlGenerator,
         private AccountMailer $mailer,
+        private EntityManagerInterface $entityManager,
     ) {
     }
 
@@ -61,9 +63,20 @@ final readonly class PasswordResetService
             throw new \RuntimeException('Password reset failed.');
         }
 
-        $user->setPassword($this->hasher->hashPassword($user, $plainPassword));
-        $this->users->save($user);
-        $this->resetPasswordHelper->removeResetRequest($token);
-        $this->resetRequests->removeRequests($user);
+        $currentHash = $user->getPassword();
+        $newHash = $this->hasher->hashPassword($user, $plainPassword);
+
+        try {
+            $this->entityManager->wrapInTransaction(function () use ($user, $token, $newHash): void {
+                $user->setPassword($newHash);
+                $this->users->save($user, false);
+                $this->resetPasswordHelper->removeResetRequest($token);
+                $this->resetRequests->removeRequests($user);
+            });
+        } catch (\Throwable $failure) {
+            $user->setPassword($currentHash);
+
+            throw $failure;
+        }
     }
 }
