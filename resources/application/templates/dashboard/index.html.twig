@@ -1,0 +1,22 @@
+{% extends 'layout/app.html.twig' %}
+
+{% block title %}Dashboard · Application{% endblock %}
+
+{% block main %}
+<main class="mx-auto w-full max-w-6xl space-y-8 px-4 py-10 sm:px-6 lg:px-8">
+    <header class="space-y-2">
+        <h1 class="text-3xl font-semibold tracking-tight">Dashboard</h1>
+        <p class="max-w-2xl text-sm leading-6 text-muted-foreground">This is your authenticated application shell. Replace this starting point with the work that matters to your users.</p>
+    </header>
+
+    <twig:Card>
+        <twig:Card:Header>
+            <twig:Card:Title><h2>Your workspace is ready</h2></twig:Card:Title>
+            <twig:Card:Description>There is nothing here yet. Account settings are available whenever you need them.</twig:Card:Description>
+        </twig:Card:Header>
+        <twig:Card:Footer>
+            <twig:Button as="a" href="{{ path('app_account') }}" variant="outline">Open account settings</twig:Button>
+        </twig:Card:Footer>
+    </twig:Card>
+</main>
+{% endblock %}
