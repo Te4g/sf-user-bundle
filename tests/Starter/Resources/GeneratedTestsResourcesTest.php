@@ -5,7 +5,11 @@ declare(strict_types=1);
 namespace Te4g\Starter\Tests\Resources;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 use Symfony\Component\Process\Process;
+use Symfony\Component\Validator\Constraints\PasswordStrength;
+use Symfony\Component\Validator\Constraints\PasswordStrengthValidator;
+use Symfony\Component\Yaml\Yaml;
 use Te4g\Starter\Generation\ResourceCatalog;
 
 final class GeneratedTestsResourcesTest extends TestCase
@@ -15,6 +19,8 @@ final class GeneratedTestsResourcesTest extends TestCase
         $files = (new ResourceCatalog($this->applicationResources()))->files();
 
         foreach ([
+            'EmailLinkExtractor.php',
+            'ObservableTestLogger.php',
             'RegistrationVerificationTest.php',
             'AuthenticationTest.php',
             'PasswordResetTest.php',
@@ -23,6 +29,8 @@ final class GeneratedTestsResourcesTest extends TestCase
         ] as $name) {
             self::assertArrayHasKey('tests/Functional/'.$name, $files);
         }
+
+        self::assertArrayHasKey('config/packages/test/account_tests.yaml', $files);
     }
 
     public function testEveryGeneratedFunctionalTestResourceParsesAndLints(): void
@@ -52,6 +60,95 @@ final class GeneratedTestsResourcesTest extends TestCase
         self::assertStringContainsString('flush()', $helper);
         self::assertStringContainsString("createQuery('DELETE FROM '.ResetPasswordRequest::class)", $helper);
         self::assertStringContainsString("createQuery('DELETE FROM '.User::class)", $helper);
+        self::assertStringContainsString('ObservableTestLogger::clear()', $helper);
+    }
+
+    public function testRenderedTemplatedEmailClearsContextAndTheExtractorReadsADecodedAbsoluteHref(): void
+    {
+        $extractor = $this->applicationResources().'/tests/Functional/EmailLinkExtractor.php';
+        self::assertFileExists($extractor);
+        require_once $extractor;
+
+        $email = (new TemplatedEmail())
+            ->htmlTemplate('email/verify.html.twig')
+            ->context(['absolute_url' => 'https://localhost/verify/email?id=1&signature=a%2Bb'])
+            ->html('<p><a href="https://localhost/verify/email?id=1&amp;signature=a%2Bb">Verify</a></p>')
+        ;
+        $email->markAsRendered();
+
+        self::assertSame([], $email->getContext());
+        $extractorClass = 'App\Tests\Functional\EmailLinkExtractor';
+        self::assertTrue(class_exists($extractorClass));
+        self::assertSame(
+            'https://localhost/verify/email?id=1&signature=a%2Bb',
+            (new \ReflectionMethod($extractorClass, 'from'))->invoke(null, $email, 'localhost', 'https'),
+        );
+    }
+
+    public function testGeneratedSuccessAndExpiryPasswordsMeetTheInstalledMediumStrengthConstraint(): void
+    {
+        $settings = $this->methodSource(
+            $this->resource('tests/Functional/AccountSettingsTest.php'),
+            'testPasswordChangeRejectsTheWrongCurrentPasswordAndClearsResetRequestsOnSuccess',
+        );
+        $expiredReset = $this->methodSource(
+            $this->resource('tests/Functional/PasswordResetTest.php'),
+            'testExpiredResetLinksAreRejectedWithoutChangingThePassword',
+        );
+        $strongPassword = 'Correct Horse Battery Staple 42!';
+
+        self::assertGreaterThanOrEqual(
+            PasswordStrength::STRENGTH_MEDIUM,
+            PasswordStrengthValidator::estimateStrength($strongPassword),
+        );
+        self::assertSame(5, substr_count($settings, "'".$strongPassword."'"));
+        self::assertSame(2, substr_count($expiredReset, "'".$strongPassword."'"));
+        self::assertStringNotContainsString("'new-password'", $settings);
+        self::assertStringNotContainsString("'new-password'", $expiredReset);
+    }
+
+    public function testGeneratedTestInfrastructureUsesAnObservableLoggerAndEphemeralLimiterStorage(): void
+    {
+        $configuration = Yaml::parseFile($this->applicationResources().'/config/packages/test/account_tests.yaml');
+        self::assertSame(
+            'cache.adapter.array',
+            $configuration['framework']['cache']['pools']['cache.account_test_rate_limiter']['adapter'] ?? null,
+        );
+
+        foreach ([
+            'account_login',
+            'account_registration',
+            'account_magic_link',
+            'account_password_reset',
+            'account_verification_resend',
+            'account_email_change',
+        ] as $limiter) {
+            self::assertSame(
+                'cache.account_test_rate_limiter',
+                $configuration['framework']['rate_limiter'][$limiter]['cache_pool'] ?? null,
+                $limiter,
+            );
+        }
+
+        self::assertSame(
+            'App\Tests\Functional\ObservableTestLogger',
+            $configuration['services']['logger']['alias'] ?? null,
+        );
+        $logger = $this->applicationResources().'/tests/Functional/ObservableTestLogger.php';
+        self::assertFileExists($logger);
+        require_once $logger;
+        $loggerClass = 'App\Tests\Functional\ObservableTestLogger';
+        if (!class_exists($loggerClass)) {
+            self::fail('The generated observable logger class was not loaded.');
+        }
+        $logger = (new \ReflectionClass(\App\Tests\Functional\ObservableTestLogger::class))->newInstance();
+        (new \ReflectionMethod($loggerClass, 'clear'))->invoke(null);
+        (new \ReflectionMethod($loggerClass, 'info'))->invoke($logger, 'application security probe for {route}', ['route' => 'app_login']);
+        self::assertSame(1, (new \ReflectionMethod($loggerClass, 'count'))->invoke(null));
+        $contents = (new \ReflectionMethod($loggerClass, 'contents'))->invoke(null);
+        self::assertIsString($contents);
+        self::assertStringContainsString('application security probe', $contents);
+        self::assertStringContainsString('app_login', $contents);
     }
 
     public function testGeneratedSuitesSubstantivelyCoverTheApprovedAccountLifecycle(): void
@@ -82,7 +179,10 @@ final class GeneratedTestsResourcesTest extends TestCase
             ],
             'SecurityBoundaryTest.php' => [
                 'testEveryStateChangingFormRejectsAnInvalidCsrfToken',
+                'testResetFormRejectsInvalidCsrfWithoutConsumingTheToken',
                 'testEveryConfiguredAccountLimiterAcceptsFiveAttemptsAndRejectsTheSixth',
+                'testLimiterStateAccumulatesInsideAKernelAndResetsWithAFreshKernel',
+                'testMagicLinkEndpointLimiterAccumulatesAcrossRequestsWithoutKernelReboot',
                 'testEmailAddressSubmissionEndpointsHaveNeutralKnownAndUnknownResponses',
                 'testSubmittedPasswordsAreAbsentFromResponsesAndApplicationLogs',
             ],
@@ -159,6 +259,53 @@ final class GeneratedTestsResourcesTest extends TestCase
 
         self::assertStringContainsString('applicationLogs()', $suite);
         self::assertStringContainsString('assertStringNotContainsString($secret, $logs)', $suite);
+
+        $resetCsrf = $this->methodSource(
+            $this->resource('tests/Functional/SecurityBoundaryTest.php'),
+            'testResetFormRejectsInvalidCsrfWithoutConsumingTheToken',
+        );
+        foreach ([
+            'app_forgot_password_reset',
+            "'reset_password' => [",
+            "'_token' => 'invalid'",
+            'ResetPasswordHelperInterface::class',
+            "'Correct Horse Battery Staple 42!'",
+            "'old-password'",
+        ] as $required) {
+            self::assertStringContainsString($required, $resetCsrf, $required);
+        }
+
+        $secretCoverage = $this->methodSource(
+            $this->resource('tests/Functional/SecurityBoundaryTest.php'),
+            'testSubmittedPasswordsAreAbsentFromResponsesAndApplicationLogs',
+        );
+        foreach ([
+            'registrationSecret',
+            'loginSecret',
+            'currentPasswordSecret',
+            'newPasswordSecret',
+            'resetPasswordSecret',
+            'deletionPasswordSecret',
+            'ObservableTestLogger::count()',
+        ] as $required) {
+            self::assertStringContainsString($required, $secretCoverage, $required);
+        }
+
+        $limiterIsolation = $this->methodSource(
+            $this->resource('tests/Functional/SecurityBoundaryTest.php'),
+            'testLimiterStateAccumulatesInsideAKernelAndResetsWithAFreshKernel',
+        );
+        foreach (['task-10-repeat-run-isolation', 'ensureKernelShutdown()', 'static::createClient()', 'assertFalse', 'assertTrue'] as $required) {
+            self::assertStringContainsString($required, $limiterIsolation, $required);
+        }
+
+        $endpointLimiter = $this->methodSource(
+            $this->resource('tests/Functional/SecurityBoundaryTest.php'),
+            'testMagicLinkEndpointLimiterAccumulatesAcrossRequestsWithoutKernelReboot',
+        );
+        foreach (['disableReboot()', 'app_login_link_request', 'endpoint-limit@example.com', 'assertEmailCount(5)'] as $required) {
+            self::assertStringContainsString($required, $endpointLimiter, $required);
+        }
     }
 
     /** @return list<string> */
@@ -197,6 +344,18 @@ final class GeneratedTestsResourcesTest extends TestCase
         }
 
         return $methods;
+    }
+
+    private function methodSource(string $source, string $method): string
+    {
+        $start = strpos($source, 'function '.$method.'(');
+        self::assertIsInt($start, $method);
+        $nextPublic = strpos($source, "\n    public function ", $start + 1);
+        $nextPrivate = strpos($source, "\n    private function ", $start + 1);
+        $ends = array_filter([$nextPublic, $nextPrivate], is_int(...));
+        $end = [] === $ends ? strlen($source) : min($ends);
+
+        return substr($source, $start, $end - $start);
     }
 
     private function applicationResources(): string

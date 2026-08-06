@@ -41,8 +41,8 @@ final class AccountSettingsTest extends AccountWebTestCase
         $crawler = $this->client->request('GET', $this->url('app_account_password'));
         $this->client->submit($crawler->filter('form[name="password_change"]')->form([
             'password_change[currentPassword]' => 'wrong-password',
-            'password_change[plainPassword][first]' => 'new-password',
-            'password_change[plainPassword][second]' => 'new-password',
+            'password_change[plainPassword][first]' => 'Correct Horse Battery Staple 42!',
+            'password_change[plainPassword][second]' => 'Correct Horse Battery Staple 42!',
         ]));
         self::assertResponseStatusCodeSame(422);
         $hasher = static::getContainer()->get(UserPasswordHasherInterface::class);
@@ -53,12 +53,12 @@ final class AccountSettingsTest extends AccountWebTestCase
         $crawler = $this->client->request('GET', $this->url('app_account_password'));
         $this->client->submit($crawler->filter('form[name="password_change"]')->form([
             'password_change[currentPassword]' => 'old-password',
-            'password_change[plainPassword][first]' => 'new-password',
-            'password_change[plainPassword][second]' => 'new-password',
+            'password_change[plainPassword][first]' => 'Correct Horse Battery Staple 42!',
+            'password_change[plainPassword][second]' => 'Correct Horse Battery Staple 42!',
         ]));
 
         self::assertResponseRedirects($this->url('app_account'));
-        self::assertTrue($hasher->isPasswordValid($this->refreshUser($user), 'new-password'));
+        self::assertTrue($hasher->isPasswordValid($this->refreshUser($user), 'Correct Horse Battery Staple 42!'));
         self::assertSame(0, $this->entityManager()->getRepository(ResetPasswordRequest::class)->count([]));
     }
 

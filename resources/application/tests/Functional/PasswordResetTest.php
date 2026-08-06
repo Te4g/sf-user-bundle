@@ -52,8 +52,8 @@ final class PasswordResetTest extends AccountWebTestCase
 
         $crawler = $this->client->request('GET', $link);
         $this->client->submit($crawler->filter('form[name="reset_password"]')->form([
-            'reset_password[plainPassword][first]' => 'new-password',
-            'reset_password[plainPassword][second]' => 'new-password',
+            'reset_password[plainPassword][first]' => 'Correct Horse Battery Staple 42!',
+            'reset_password[plainPassword][second]' => 'Correct Horse Battery Staple 42!',
         ]));
 
         self::assertResponseStatusCodeSame(422);
