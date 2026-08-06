@@ -1,0 +1,29 @@
+framework:
+    cache:
+        pools:
+            cache.account_login_links: ~
+    rate_limiter:
+        account_login:
+            policy: sliding_window
+            limit: 5
+            interval: '15 minutes'
+        account_registration:
+            policy: sliding_window
+            limit: 5
+            interval: '15 minutes'
+        account_magic_link:
+            policy: sliding_window
+            limit: 5
+            interval: '15 minutes'
+        account_password_reset:
+            policy: sliding_window
+            limit: 5
+            interval: '15 minutes'
+        account_verification_resend:
+            policy: sliding_window
+            limit: 5
+            interval: '15 minutes'
+        account_email_change:
+            policy: sliding_window
+            limit: 5
+            interval: '15 minutes'

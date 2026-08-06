@@ -1,0 +1,3 @@
+twig:
+    form_themes:
+        - form/account_theme.html.twig

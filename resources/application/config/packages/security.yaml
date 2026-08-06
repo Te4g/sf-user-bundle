@@ -1,0 +1,35 @@
+security:
+    password_hashers:
+        Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface: auto
+    providers:
+        app_user_provider:
+            entity:
+                class: App\Entity\User
+                property: email
+    firewalls:
+        dev:
+            pattern: ^/(_(profiler|wdt)|css|images|js)/
+            security: false
+        main:
+            lazy: true
+            provider: app_user_provider
+            form_login:
+                login_path: app_login
+                check_path: app_login
+                enable_csrf: true
+                default_target_path: app_dashboard
+            login_link:
+                check_route: app_login_link_check
+                signature_properties: ['id', 'email', 'password']
+                lifetime: 600
+                max_uses: 1
+                check_post_only: true
+                used_link_cache: cache.account_login_links
+                success_handler: App\Security\MagicLinkAuthenticationSuccessHandler
+            logout:
+                path: app_logout
+                target: app_home
+                enable_csrf: true
+    access_control:
+        - { path: ^/dashboard, roles: ROLE_USER }
+        - { path: ^/account, roles: ROLE_USER }
