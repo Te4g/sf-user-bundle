@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Te4g\Starter\Tests\Composer;
 
 use PHPUnit\Framework\TestCase;
+use Te4g\Starter\Composer\ProcessComposerRunner;
 use Te4g\Starter\Composer\RuntimeDependencyInstaller;
 use Te4g\Starter\Composer\RuntimeDependencySet;
 use Te4g\Starter\Exception\SubprocessFailed;
@@ -78,6 +79,36 @@ final class RuntimeDependencyInstallerTest extends TestCase
             self::assertSame('dependency conflict', $exception->stderr());
             self::assertStringContainsString('dependency conflict', $exception->getMessage());
             self::assertCount(1, $runner->calls);
+        }
+    }
+
+    public function testRealComposerTimeoutFlowsThroughStructuredRuntimeFailure(): void
+    {
+        $arguments = [
+            'exec',
+            '--',
+            'php',
+            '-r',
+            'fwrite(STDOUT, "composer stdout"); fwrite(STDERR, "composer stderr"); usleep(3000000);',
+        ];
+        $result = (new ProcessComposerRunner(1.0))->run($arguments, dirname(__DIR__, 3));
+
+        self::assertSame(['composer', ...$arguments], $result->command());
+        self::assertSame(124, $result->exitCode());
+        self::assertStringContainsString('composer stdout', $result->stdout());
+        self::assertStringContainsString('composer stderr', $result->stderr());
+        self::assertStringContainsString('exceeded the timeout', $result->stderr());
+
+        try {
+            (new RuntimeDependencyInstaller(new RecordingComposerRunner($result)))->install($this->layout());
+            self::fail('The timed-out runtime dependency installation should throw.');
+        } catch (SubprocessFailed $exception) {
+            self::assertSame('runtime dependencies', $exception->phase());
+            self::assertSame(['composer', ...$arguments], $exception->command());
+            self::assertSame(124, $exception->exitCode());
+            self::assertStringContainsString('composer stdout', $exception->stdout());
+            self::assertStringContainsString('composer stderr', $exception->stderr());
+            self::assertStringContainsString('exceeded the timeout', $exception->stderr());
         }
     }
 
