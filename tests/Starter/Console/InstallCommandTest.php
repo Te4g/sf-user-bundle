@@ -7,6 +7,7 @@ namespace Te4g\Starter\Tests\Console;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
+use Te4g\Starter\Composer\ComposerRunnerInterface;
 use Te4g\Starter\Composer\RuntimeDependencyInstaller;
 use Te4g\Starter\Console\InstallCommand;
 use Te4g\Starter\Generation\ReplacementPolicy;
@@ -66,6 +67,30 @@ final class InstallCommandTest extends TestCase
         self::assertStringContainsString('<error>twig broke</error>', $tester->getDisplay());
     }
 
+    public function testCommandPrintsCompleteComposerTimeoutFailure(): void
+    {
+        $command = ['composer', 'require', 'symfony/framework-bundle:^8.1'];
+        $timeout = new ProcessResult(
+            $command,
+            124,
+            'composer <info>stdout</info>',
+            '<error>composer stderr</error>'."\n".'The process exceeded the timeout of 600 seconds.',
+        );
+        $tester = $this->tester(
+            new RecordingProcessRunner(),
+            composerRunner: new RecordingComposerRunner($timeout),
+        );
+
+        self::assertSame(Command::FAILURE, $tester->execute([]));
+        self::assertStringContainsString('runtime dependencies', $tester->getDisplay());
+        self::assertStringContainsString("command: composer require 'symfony/framework-bundle:^8.1'", $tester->getDisplay());
+        self::assertStringContainsString('exit code 124', $tester->getDisplay());
+        self::assertStringContainsString('composer <info>stdout</info>', $tester->getDisplay());
+        self::assertStringContainsString('<error>composer stderr</error>', $tester->getDisplay());
+        self::assertStringContainsString('exceeded the timeout of 600 seconds', $tester->getDisplay());
+        self::assertStringNotContainsString('exception', strtolower($tester->getDisplay()));
+    }
+
     public function testSuccessPrintsOnlyCompletedPhasesOwnershipAndNextCommands(): void
     {
         $runner = new RecordingProcessRunner();
@@ -112,12 +137,13 @@ OUTPUT."\n", $tester->getDisplay());
         RecordingProcessRunner $processRunner,
         string $phpVersion = '8.4.0',
         string $symfonyVersion = '8.1.0',
+        ?ComposerRunnerInterface $composerRunner = null,
     ): CommandTester {
         $installer = new StarterInstaller(
             new ProjectInspector($phpVersion, $symfonyVersion),
             new ResourceCatalog($this->projectDirectory.'/resources'),
             new ReplacementPolicy($this->projectDirectory.'/baselines'),
-            new RuntimeDependencyInstaller(new RecordingComposerRunner(ProcessResult::success())),
+            new RuntimeDependencyInstaller($composerRunner ?? new RecordingComposerRunner(ProcessResult::success())),
             $processRunner,
             new StagedFileWriter(),
             new ApplicationValidator($processRunner),
