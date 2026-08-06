@@ -1,0 +1,10 @@
+security:
+    providers:
+        users_in_memory:
+            memory: null
+    firewalls:
+        dev:
+            pattern: ^/api
+            stateless: true
+        main:
+            lazy: true

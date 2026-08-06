@@ -132,7 +132,10 @@ final readonly class ProjectInspector
         }
 
         foreach ($firewalls as $name => $firewall) {
-            if ('dev' === $name) {
+            if ('dev' === $name && [
+                'pattern' => '^/(_(profiler|wdt)|css|images|js)/',
+                'security' => false,
+            ] === $firewall) {
                 continue;
             }
             if ('main' !== $name || ['lazy' => true] !== $firewall) {

@@ -54,6 +54,22 @@ final class ProjectInspectorTest extends TestCase
         ], array_map(static fn (Conflict $conflict): string => $conflict->message(), $report->conflicts()));
     }
 
+    public function testCustomizedDevFirewallReportsAnExactConflict(): void
+    {
+        $report = (new ProjectInspector('8.4.12', '8.1.2'))->inspect($this->layout('customized-dev-firewall'));
+
+        self::assertSame([
+            'config/packages/security.yaml: a non-default security firewall is already configured',
+        ], array_map(static fn (Conflict $conflict): string => $conflict->message(), $report->conflicts()));
+    }
+
+    public function testDefaultDevFirewallRemainsCompatible(): void
+    {
+        $report = (new ProjectInspector('8.4.12', '8.1.2'))->inspect($this->layout('default-security'));
+
+        self::assertTrue($report->isCompatible());
+    }
+
     public function testReportsAllConflictsInPathSortedOrder(): void
     {
         $report = (new ProjectInspector('8.3.99', '8.2.0'))->inspect($this->layout('existing-account'));
