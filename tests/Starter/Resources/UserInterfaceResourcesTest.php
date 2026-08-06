@@ -224,6 +224,16 @@ final class UserInterfaceResourcesTest extends TestCase
         self::assertTrue($process->isSuccessful(), $process->getErrorOutput().$process->getOutput());
     }
 
+    public function testThemeBehaviorFollowsTheDeviceAndPersistsExplicitChoices(): void
+    {
+        $test = dirname(__DIR__).'/Fixtures/theme.test.mjs';
+        $theme = $this->applicationResources().'/assets/theme.js';
+        $process = new Process(['node', $test, $theme]);
+        $process->run();
+
+        self::assertTrue($process->isSuccessful(), $process->getErrorOutput().$process->getOutput());
+    }
+
     public function testTwigYamlTranslationSvgAndBrowserOnlyBehaviorPassStaticGates(): void
     {
         $validator = new StaticResourceValidator();
