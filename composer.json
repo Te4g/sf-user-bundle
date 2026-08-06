@@ -1,15 +1,20 @@
 {
-    "name": "te4g/user-bundle",
-    "description": "Opinionated Symfony user account lifecycle bundle",
-    "type": "symfony-bundle",
+    "name": "te4g/starter",
+    "description": "One-shot Symfony application and user account starter",
+    "type": "library",
     "license": "GPL-3.0-only",
+    "bin": [
+        "bin/te4g-starter"
+    ],
     "autoload": {
         "psr-4": {
+            "Te4g\\Starter\\": "src/Starter/",
             "Te4g\\UserBundle\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
+            "Te4g\\Starter\\Tests\\": "tests/Starter/",
             "Te4g\\UserBundle\\Tests\\": "tests/",
             "Te4g\\UserBundle\\Tools\\": "tools/"
         }
