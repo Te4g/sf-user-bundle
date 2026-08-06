@@ -87,7 +87,8 @@ final class StagedFileWriterTest extends TestCase
     public function testCreatesNestedApplicationDirectoriesWithPortablePermissions(): void
     {
         $layout = $this->layout();
-        $previousUmask = umask(0);
+        $target = $layout->path('src/Account/Example.php');
+        $previousUmask = umask(0077);
 
         try {
             $this->writer()->write(
@@ -102,6 +103,59 @@ final class StagedFileWriterTest extends TestCase
             $path = $layout->path($directory);
             clearstatcache(true, $path);
             self::assertSame(0755, fileperms($path) & 0777, $directory);
+        }
+
+        clearstatcache(true, $target);
+        self::assertSame(0644, fileperms($target) & 0777);
+    }
+
+    public function testDoesNotChangePreExistingApplicationDirectoryPermissions(): void
+    {
+        $layout = $this->layout();
+        $existingDirectory = $layout->path('src');
+        self::assertTrue(mkdir($existingDirectory, 0711));
+        self::assertTrue(chmod($existingDirectory, 0711));
+        $target = $layout->path('src/Account/Example.php');
+        $previousUmask = umask(0077);
+
+        try {
+            $this->writer()->write(
+                $layout,
+                $this->planForResource('src/Account/Example.php', '<?php final class GeneratedExample {}'),
+            );
+        } finally {
+            umask($previousUmask);
+        }
+
+        foreach ([$existingDirectory => 0711, $layout->path('src/Account') => 0755, $target => 0644] as $path => $mode) {
+            clearstatcache(true, $path);
+            self::assertSame($mode, fileperms($path) & 0777, $path);
+        }
+    }
+
+    public function testStagedDirectoriesAndFilesRemainPrivate(): void
+    {
+        $source = $this->temporaryDirectory.'/private-resource';
+        self::assertNotFalse(file_put_contents($source, '<?php final class GeneratedExample {}'));
+        self::assertTrue(chmod($source, 0644));
+        $destination = $this->temporaryDirectory.'/staging/src/Account/Example.php';
+        $previousUmask = umask(0);
+
+        try {
+            (new \ReflectionMethod(StagedFileWriter::class, 'copy'))
+                ->invoke($this->writer(), $source, $destination);
+        } finally {
+            umask($previousUmask);
+        }
+
+        foreach ([
+            $this->temporaryDirectory.'/staging' => 0700,
+            $this->temporaryDirectory.'/staging/src' => 0700,
+            $this->temporaryDirectory.'/staging/src/Account' => 0700,
+            $destination => 0600,
+        ] as $path => $mode) {
+            clearstatcache(true, $path);
+            self::assertSame($mode, fileperms($path) & 0777, $path);
         }
     }
 
