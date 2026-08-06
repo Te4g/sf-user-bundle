@@ -15,9 +15,11 @@ Login is limited to five attempts per fifteen minutes. Account request flows use
 | email verification | 3,600 seconds | signed request |
 | password reset | 3,600 seconds | persisted request and one-hour request throttle |
 | magic login | 600 seconds | ID, email, and password signature properties; one use; used-link cache; POST-only CSRF-protected completion |
-| pending email change | signed workflow | current-password confirmation before request |
+| pending email change | 3,600 seconds | authenticated request; signed confirmation sent to the pending address |
 
 Magic links make the inbox an authentication factor. Add application-level MFA or step-up authentication when inbox control alone is insufficient.
+
+Email-change requests are available only to authenticated accounts. The active login identifier remains unchanged until a valid signed confirmation promotes the pending address.
 
 The generated login-link subscriber validates the routed POST form's `_csrf_token` before Symfony's authenticator consumes the link. Query-string tokens are ignored. Login and logout use CSRF protection, and logout is POST-only.
 
@@ -43,4 +45,4 @@ The generated functional tests install observable request and security loggers t
 
 ## Vendored UI and offline assets
 
-The generated application receives a reviewed Twig component snapshot and seven local Lucide icons. Provenance is recorded in `resources/shadcn/manifest.json` and `THIRD_PARTY_NOTICES.md`. Installation and tests use a caller-provisioned Tailwind CSS 4.3.3 executable whose platform checksum is pinned in the starter test support; they never download a binary implicitly.
+The generated application receives a reviewed Twig component snapshot and seven local Lucide icons. Provenance is recorded in `resources/shadcn/manifest.json` and `THIRD_PARTY_NOTICES.md`. Its TailwindBundle configuration pins `binary_version` to Tailwind CSS 4.3.3. Normal installation follows TailwindBundle's binary behavior and may download that binary when it is not already available. Only this repository's maintainer test and smoke gates require a caller-provisioned `TE4G_TAILWIND_BINARY` and validate its platform checksum.
