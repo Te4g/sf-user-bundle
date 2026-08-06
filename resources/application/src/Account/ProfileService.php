@@ -9,6 +9,7 @@ use App\Mailer\AccountMailer;
 use App\Repository\ResetPasswordRequestRepository;
 use App\Repository\UserRepository;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
+use Doctrine\ORM\EntityManagerInterface;
 use SymfonyCasts\Bundle\VerifyEmail\Exception\VerifyEmailExceptionInterface;
 use SymfonyCasts\Bundle\VerifyEmail\VerifyEmailHelperInterface;
 
@@ -20,6 +21,7 @@ final readonly class ProfileService
         private VerifyEmailHelperInterface $verifyEmailHelper,
         private AccountMailer $mailer,
         private ResetPasswordRequestRepository $resetRequests,
+        private EntityManagerInterface $entityManager,
     ) {
     }
 
@@ -80,20 +82,25 @@ final readonly class ProfileService
             throw new \RuntimeException('Account update failed.');
         }
 
-        $activeEmail = $user->getEmail();
-        $user->setEmail($pendingEmail);
-        $user->setPendingEmail(null);
-
         try {
-            $this->users->save($user);
-        } catch (UniqueConstraintViolationException) {
-            $user->setEmail($activeEmail);
-            $user->setPendingEmail($pendingEmail);
+            $promoted = $this->entityManager->wrapInTransaction(function () use ($user, $userId, $pendingEmail): bool {
+                if (!$this->users->promotePendingEmail($userId, $pendingEmail)) {
+                    return false;
+                }
 
+                $this->resetRequests->removeRequests($user);
+
+                return true;
+            });
+        } catch (UniqueConstraintViolationException) {
             throw new \RuntimeException('Account update failed.');
         }
 
-        $this->resetRequests->removeRequests($user);
+        if (!$promoted) {
+            throw new \RuntimeException('Account update failed.');
+        }
+
+        $this->entityManager->refresh($user);
 
         return $user;
     }
