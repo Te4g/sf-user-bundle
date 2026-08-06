@@ -385,6 +385,15 @@ final class GeneratedTestsResourcesTest extends TestCase
         );
         self::assertStringContainsString('form:not([action])', $neutralEndpoints);
         self::assertStringContainsString('assertCount(1, $formNodes)', $neutralEndpoints);
+
+        $rejectedLocaleChanges = $this->methodSource(
+            $this->resource('tests/Functional/LocalePreferenceTest.php'),
+            'testLocaleChangeRejectsInvalidCsrfAndUnsupportedLocales',
+        );
+        self::assertSame(
+            2,
+            substr_count($rejectedLocaleChanges, "assertFalse(\$this->client->getResponse()->headers->has('Set-Cookie'))"),
+        );
     }
 
     /** @return list<string> */

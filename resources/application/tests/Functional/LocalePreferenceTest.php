@@ -79,6 +79,7 @@ final class LocalePreferenceTest extends AccountWebTestCase
         ]);
 
         self::assertResponseStatusCodeSame(Response::HTTP_UNPROCESSABLE_ENTITY);
+        self::assertFalse($this->client->getResponse()->headers->has('Set-Cookie'));
         self::assertSame($localeBefore, $this->refreshUser($user)->getLocale());
         self::assertSame($cookieBefore->getValue(), $this->client->getCookieJar()->get('app_locale')?->getValue());
 
@@ -87,6 +88,7 @@ final class LocalePreferenceTest extends AccountWebTestCase
         $this->client->submit($form, ['locale' => 'de']);
 
         self::assertResponseStatusCodeSame(Response::HTTP_UNPROCESSABLE_ENTITY);
+        self::assertFalse($this->client->getResponse()->headers->has('Set-Cookie'));
         self::assertSame($localeBefore, $this->refreshUser($user)->getLocale());
         self::assertSame($cookieBefore->getValue(), $this->client->getCookieJar()->get('app_locale')?->getValue());
     }
