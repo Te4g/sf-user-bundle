@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Te4g\UserBundle\Tools;
+namespace Te4g\Starter\Tools;
 
 final class ShadcnSnapshotSynchronizer
 {
@@ -149,7 +149,7 @@ final class ShadcnSnapshotSynchronizer
         return $manifest;
     }
 
-    /** @param list<string> $recipes
+    /** @param list<mixed> $recipes
      * @return list<string>
      */
     private function validateRecipes(array $recipes): array

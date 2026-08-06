@@ -32,7 +32,10 @@ final class SmokeScriptTest extends TestCase
         self::assertSame([
             'Te4g\\Starter\\' => 'src/Starter/',
         ], $composer['autoload']['psr-4'] ?? null);
-        self::assertSame('src/', $composer['autoload-dev']['psr-4']['Te4g\\UserBundle\\'] ?? null);
+        self::assertSame([
+            'Te4g\\Starter\\Tests\\' => 'tests/Starter/',
+            'Te4g\\Starter\\Tools\\' => 'tools/',
+        ], $composer['autoload-dev']['psr-4'] ?? null);
     }
 
     public function testSmokeScriptProvesDatabaseIndependenceAndPackageRemoval(): void

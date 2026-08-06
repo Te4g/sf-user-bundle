@@ -1,6 +1,7 @@
 parameters:
     level: 8
     paths:
-        - src
-        - tests
+        - src/Starter
+        - tests/Starter
+        - tools
     tmpDir: var/phpstan
