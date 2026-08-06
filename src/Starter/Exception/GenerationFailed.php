@@ -41,4 +41,9 @@ final class GenerationFailed extends \RuntimeException
     {
         return new self(sprintf('Generated application resource is invalid: %s', $path), 0, $previous);
     }
+
+    public static function plannedTargetChanged(string $path, string $operation): self
+    {
+        return new self(sprintf('%s: planned %s target changed', $path, $operation));
+    }
 }

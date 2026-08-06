@@ -20,6 +20,10 @@ final readonly class StagedFileWriter
         if (!mkdir($temporaryDirectory, 0700, true)) {
             throw GenerationFailed::stagingUnavailable();
         }
+        $temporaryIdentity = lstat($temporaryDirectory);
+        if (false === $temporaryIdentity) {
+            throw GenerationFailed::stagingUnavailable();
+        }
 
         try {
             foreach ($plan->writes() as $resource) {
@@ -30,10 +34,17 @@ final readonly class StagedFileWriter
 
             foreach ($plan->writes() as $resource) {
                 $target = $layout->path($resource->relativePath());
-                $this->copy($this->stagedPath($temporaryDirectory, $resource->relativePath()), $target);
+                $stagedPath = $this->stagedPath($temporaryDirectory, $resource->relativePath());
+                if ($resource->isCreation()) {
+                    $this->createTarget($stagedPath, $target, $resource->relativePath());
+
+                    continue;
+                }
+
+                $this->replaceTarget($stagedPath, $target, $resource);
             }
         } finally {
-            $this->removeDirectory($temporaryDirectory);
+            $this->removeTemporaryDirectory($temporaryDirectory, $temporaryIdentity);
         }
     }
 
@@ -69,12 +80,92 @@ final readonly class StagedFileWriter
         }
     }
 
-    private function removeDirectory(string $directory): void
+    private function createTarget(string $source, string $target, string $relativePath): void
     {
-        if (!is_dir($directory)) {
+        $directory = dirname($target);
+        if (!is_dir($directory) && !mkdir($directory, 0700, true)) {
+            throw GenerationFailed::cannotWrite($target);
+        }
+
+        $destination = @fopen($target, 'xb');
+        if (false === $destination) {
+            if (file_exists($target) || is_link($target)) {
+                throw GenerationFailed::plannedTargetChanged($relativePath, 'create');
+            }
+
+            throw GenerationFailed::cannotWrite($target);
+        }
+
+        $input = fopen($source, 'rb');
+        if (false === $input) {
+            fclose($destination);
+            throw GenerationFailed::unreadableResource($source);
+        }
+
+        try {
+            if (false === stream_copy_to_stream($input, $destination)) {
+                throw GenerationFailed::cannotWrite($target);
+            }
+        } finally {
+            fclose($input);
+            fclose($destination);
+        }
+    }
+
+    private function replaceTarget(string $source, string $target, PlannedResource $resource): void
+    {
+        $this->assertReplacementTarget($target, $resource);
+        $temporaryTarget = tempnam(dirname($target), '.te4g-starter-');
+        if (false === $temporaryTarget) {
+            throw GenerationFailed::cannotWrite($target);
+        }
+
+        try {
+            $this->copy($source, $temporaryTarget);
+            $this->assertReplacementTarget($target, $resource);
+            if (!rename($temporaryTarget, $target)) {
+                throw GenerationFailed::cannotWrite($target);
+            }
+        } finally {
+            if (file_exists($temporaryTarget) || is_link($temporaryTarget)) {
+                unlink($temporaryTarget);
+            }
+        }
+    }
+
+    private function assertReplacementTarget(string $target, PlannedResource $resource): void
+    {
+        $contents = !is_link($target) && is_file($target) && is_readable($target) ? file_get_contents($target) : false;
+        if (false === $contents || $contents !== $resource->expectedContents()) {
+            throw GenerationFailed::plannedTargetChanged($resource->relativePath(), 'replacement');
+        }
+    }
+
+    /** @param array<int|string, int> $expectedIdentity */
+    private function removeTemporaryDirectory(string $directory, array $expectedIdentity): void
+    {
+        $actualIdentity = lstat($directory);
+        if (false === $actualIdentity) {
             return;
         }
 
+        if (is_link($directory)) {
+            unlink($directory);
+
+            return;
+        }
+
+        if (!is_dir($directory)
+            || $actualIdentity['dev'] !== $expectedIdentity['dev']
+            || $actualIdentity['ino'] !== $expectedIdentity['ino']) {
+            return;
+        }
+
+        $this->removeOwnedDirectory($directory);
+    }
+
+    private function removeOwnedDirectory(string $directory): void
+    {
         $entries = scandir($directory);
         if (false === $entries) {
             return;
@@ -87,7 +178,7 @@ final readonly class StagedFileWriter
 
             $path = $directory.DIRECTORY_SEPARATOR.$entry;
             if (is_dir($path) && !is_link($path)) {
-                $this->removeDirectory($path);
+                $this->removeOwnedDirectory($path);
             } else {
                 unlink($path);
             }
