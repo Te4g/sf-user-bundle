@@ -1,0 +1,4 @@
+task_10_limited:
+    path: /task-10/limited
+    controller: Te4g\Starter\Tests\Resources\GeneratedTask10LimiterController
+    methods: [POST]
