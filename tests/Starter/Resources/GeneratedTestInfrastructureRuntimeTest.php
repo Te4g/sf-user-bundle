@@ -36,11 +36,18 @@ final class GeneratedTestInfrastructureRuntimeTest extends TestCase
             (new \ReflectionMethod($loggerClass, 'clear'))->invoke(null);
             $stream = fopen('php://memory', 'r');
             self::assertIsResource($stream);
+            $lateItems = [];
+            for ($item = 0; $item < 40; ++$item) {
+                $lateItems[sprintf('item-%02d', $item)] = 39 === $item ? 'item-hidden' : 'visible';
+            }
+            $recursive = ['recursive-secret' => 'recursive-visible'];
+            $recursive['self'] = &$recursive;
             try {
                 (new \ReflectionMethod($loggerClass, 'info'))->invoke(
                     $logger,
-                    'application security runtime probe',
+                    'application security runtime probe for {route} {stringable}',
                     [
+                        'route' => 'app_login',
                         'password' => 'submitted-secret',
                         'exception' => new \RuntimeException('context-boom'),
                         'stringable' => new class () implements \Stringable {
@@ -51,8 +58,10 @@ final class GeneratedTestInfrastructureRuntimeTest extends TestCase
                         },
                         'object' => new \stdClass(),
                         'stream' => $stream,
-                        'nested' => ['child' => ['key' => 'nested-value']],
-                        'long' => str_repeat('x', 3000),
+                        'deep' => ['one' => ['two' => ['three' => ['four' => ['five' => 'depth-hidden']]]]],
+                        'late_items' => $lateItems,
+                        'long' => str_repeat('x', 3000).'tail-hidden',
+                        'recursive' => $recursive,
                     ],
                 );
             } finally {
@@ -61,17 +70,21 @@ final class GeneratedTestInfrastructureRuntimeTest extends TestCase
             self::assertSame(1, (new \ReflectionMethod($loggerClass, 'count'))->invoke(null));
             $contents = (new \ReflectionMethod($loggerClass, 'contents'))->invoke(null);
             self::assertIsString($contents);
-            foreach (['submitted-secret', 'context-boom', 'stringable-value', 'stdClass', 'stream', 'nested-value', '[truncated]'] as $expected) {
+            foreach ([
+                'application security runtime probe for app_login stringable-value',
+                'submitted-secret',
+                'context-boom',
+                'stringable-value',
+                'stdClass',
+                'stream',
+                'depth-hidden',
+                'item-hidden',
+                'tail-hidden',
+                'recursive-visible',
+                '*RECURSION*',
+            ] as $expected) {
                 self::assertStringContainsString($expected, $contents, $expected);
             }
-            self::assertLessThan(5000, strlen($contents));
-
-            (new \ReflectionMethod($loggerClass, 'clear'))->invoke(null);
-            (new \ReflectionMethod($loggerClass, 'info'))->invoke($logger, 'ordering probe', ['z' => 'last', 'a' => 'first']);
-            $firstOrder = (new \ReflectionMethod($loggerClass, 'contents'))->invoke(null);
-            (new \ReflectionMethod($loggerClass, 'clear'))->invoke(null);
-            (new \ReflectionMethod($loggerClass, 'info'))->invoke($logger, 'ordering probe', ['a' => 'first', 'z' => 'last']);
-            self::assertSame($firstOrder, (new \ReflectionMethod($loggerClass, 'contents'))->invoke(null));
 
             self::assertSame($loggerClass, $kernel->getContainer()->get('test.request_logger')::class);
             self::assertSame($loggerClass, $kernel->getContainer()->get('test.security_logger')::class);

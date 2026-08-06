@@ -278,6 +278,31 @@ final class GeneratedTestsResourcesTest extends TestCase
         self::assertStringContainsString('applicationLogs()', $suite);
         self::assertStringContainsString('assertStringNotContainsString($secret, $logs)', $suite);
 
+        $allFormCsrf = $this->methodSource(
+            $this->resource('tests/Functional/SecurityBoundaryTest.php'),
+            'testEveryStateChangingFormRejectsAnInvalidCsrfToken',
+        );
+        $otherwiseValidPassword = 'Correct Horse Battery Staple 42!';
+        self::assertGreaterThanOrEqual(
+            PasswordStrength::STRENGTH_MEDIUM,
+            PasswordStrengthValidator::estimateStrength($otherwiseValidPassword),
+        );
+        foreach ([
+            "\$otherwiseValidPassword = '".$otherwiseValidPassword."'",
+            'registration-control@example.com',
+            'register-csrf@example.com',
+            "createUser('csrf-login@example.com', true, \$otherwiseValidPassword)",
+            "'_username' => 'csrf-login@example.com'",
+            "'_password' => \$otherwiseValidPassword",
+            "'_csrf_token' => 'invalid'",
+            "assertResponseRedirects(\$this->url('app_dashboard'))",
+            "assertNull(\$this->user('register-csrf@example.com'))",
+        ] as $required) {
+            self::assertStringContainsString($required, $allFormCsrf, $required);
+        }
+        self::assertStringNotContainsString("'plainPassword' => ['first' => 'password'", $allFormCsrf);
+        self::assertStringNotContainsString("'_username' => 'csrf@example.com'", $allFormCsrf);
+
         $resetCsrf = $this->methodSource(
             $this->resource('tests/Functional/SecurityBoundaryTest.php'),
             'testResetFormRejectsInvalidCsrfWithoutConsumingTheToken',

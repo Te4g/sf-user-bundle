@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional;
 
 use App\Entity\ResetPasswordRequest;
+use App\Entity\User;
 use Psr\Cache\CacheItemPoolInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
@@ -14,16 +15,32 @@ final class SecurityBoundaryTest extends AccountWebTestCase
 {
     public function testEveryStateChangingFormRejectsAnInvalidCsrfToken(): void
     {
+        $otherwiseValidPassword = 'Correct Horse Battery Staple 42!';
+        $crawler = $this->client->request('GET', $this->url('app_register'));
+        $this->client->submit($crawler->filter('form[name="registration"]')->form([
+            'registration[name]' => 'Registration Control',
+            'registration[email]' => 'registration-control@example.com',
+            'registration[plainPassword][first]' => $otherwiseValidPassword,
+            'registration[plainPassword][second]' => $otherwiseValidPassword,
+        ]));
+        self::assertResponseRedirects($this->url('app_check_email'));
+        self::assertNotNull($this->user('registration-control@example.com'));
+        $this->client->request('POST', $this->url('app_logout'), [
+            '_csrf_token' => $this->csrfToken('logout'),
+        ]);
+        self::assertResponseRedirects($this->url('app_home'));
+
         $this->client->request('POST', $this->url('app_register'), [
             'registration' => [
                 'name' => 'Invalid Csrf',
                 'email' => 'register-csrf@example.com',
-                'plainPassword' => ['first' => 'password', 'second' => 'password'],
+                'plainPassword' => ['first' => $otherwiseValidPassword, 'second' => $otherwiseValidPassword],
                 '_token' => 'invalid',
             ],
         ]);
         self::assertResponseStatusCodeSame(422);
         self::assertNull($this->user('register-csrf@example.com'));
+        self::assertSame(1, $this->entityManager()->getRepository(User::class)->count([]));
 
         foreach ([
             'app_login_link_request',
@@ -36,14 +53,28 @@ final class SecurityBoundaryTest extends AccountWebTestCase
             self::assertResponseStatusCodeSame(422, $route);
         }
 
+        $this->createUser('csrf-login@example.com', true, $otherwiseValidPassword);
+        $crawler = $this->client->request('GET', $this->url('app_login'));
+        $this->client->submit($crawler->filter('form[action="'.$this->url('app_login').'"]')->form([
+            '_username' => 'csrf-login@example.com',
+            '_password' => $otherwiseValidPassword,
+        ]));
+        self::assertResponseRedirects($this->url('app_dashboard'));
+        $this->client->request('POST', $this->url('app_logout'), [
+            '_csrf_token' => $this->csrfToken('logout'),
+        ]);
+        self::assertResponseRedirects($this->url('app_home'));
+
         $this->client->request('POST', $this->url('app_login'), [
-            '_username' => 'csrf@example.com',
-            '_password' => 'password',
+            '_username' => 'csrf-login@example.com',
+            '_password' => $otherwiseValidPassword,
             '_csrf_token' => 'invalid',
         ]);
         self::assertResponseRedirects($this->url('app_login'));
         $this->client->followRedirect();
         self::assertResponseStatusCodeSame(422);
+        $this->client->request('GET', $this->url('app_account'));
+        self::assertResponseRedirects($this->url('app_login'));
 
         $this->client->request('POST', $this->url('app_login_link_check'), [
             '_csrf_token' => 'invalid',
@@ -268,7 +299,7 @@ final class SecurityBoundaryTest extends AccountWebTestCase
 
         $logs = $this->applicationLogs();
         self::assertGreaterThan(0, ObservableTestLogger::count());
-        self::assertStringContainsString('Matched route "{route}".', $logs);
+        self::assertStringContainsString('Matched route "app_login".', $logs);
         self::assertStringContainsString('app_login', $logs);
         self::assertStringContainsString('Authenticator failed.', $logs);
         foreach ([
