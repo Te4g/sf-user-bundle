@@ -23,6 +23,27 @@ final readonly class ProjectInspector
         'src/Controller/VerificationController.php',
     ];
 
+    /** @var list<array<string, array<string, bool|string>>> */
+    private const array DEFAULT_FIREWALLS = [
+        [
+            'dev' => [
+                'pattern' => '^/(_(profiler|wdt)|css|images|js)/',
+                'security' => false,
+            ],
+            'main' => ['lazy' => true],
+        ],
+        [
+            'dev' => [
+                'pattern' => '^/(_profiler|_wdt|assets|build)/',
+                'security' => false,
+            ],
+            'main' => [
+                'lazy' => true,
+                'provider' => 'users_in_memory',
+            ],
+        ],
+    ];
+
     public function __construct(
         private string $phpVersion,
         private string $symfonyVersion,
@@ -131,27 +152,34 @@ final readonly class ProjectInspector
             return false;
         }
 
-        foreach ($firewalls as $name => $firewall) {
-            if ('dev' === $name && in_array($firewall, [
-                [
-                    'pattern' => '^/(_(profiler|wdt)|css|images|js)/',
-                    'security' => false,
-                ],
-                [
-                    'pattern' => '^/(_profiler|_wdt|assets|build)/',
-                    'security' => false,
-                ],
-            ], true)) {
-                continue;
-            }
-            if ('main' !== $name || !in_array($firewall, [
-                ['lazy' => true],
-                ['lazy' => true, 'provider' => 'users_in_memory'],
-            ], true)) {
-                return false;
+        $normalized = $this->normalizeAssociativeOrder($firewalls);
+        foreach (self::DEFAULT_FIREWALLS as $defaultFirewalls) {
+            if ($normalized === $this->normalizeAssociativeOrder($defaultFirewalls)) {
+                return true;
             }
         }
 
-        return true;
+        return false;
+    }
+
+    /**
+     * @param array<mixed> $values
+     *
+     * @return array<mixed>
+     */
+    private function normalizeAssociativeOrder(array $values): array
+    {
+        foreach ($values as &$value) {
+            if (is_array($value)) {
+                $value = $this->normalizeAssociativeOrder($value);
+            }
+        }
+        unset($value);
+
+        if (!array_is_list($values)) {
+            ksort($values);
+        }
+
+        return $values;
     }
 }
