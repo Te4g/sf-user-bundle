@@ -20,24 +20,34 @@ final readonly class AccountMailer
 
     public function sendVerification(User $user, string $absoluteUrl): void
     {
-        $this->send($user, 'Verify your email address', 'email/verify.html.twig', $absoluteUrl);
+        $this->send($user->getEmail(), 'Verify your email address', 'email/verify.html.twig', $absoluteUrl);
     }
 
     public function sendMagicLink(User $user, string $absoluteUrl): void
     {
-        $this->send($user, 'Your sign-in link', 'email/magic_link.html.twig', $absoluteUrl);
+        $this->send($user->getEmail(), 'Your sign-in link', 'email/magic_link.html.twig', $absoluteUrl);
     }
 
     public function sendPasswordReset(User $user, string $absoluteUrl): void
     {
-        $this->send($user, 'Reset your password', 'email/password_reset.html.twig', $absoluteUrl);
+        $this->send($user->getEmail(), 'Reset your password', 'email/password_reset.html.twig', $absoluteUrl);
     }
 
-    private function send(User $user, string $subject, string $template, string $absoluteUrl): void
+    public function sendEmailChange(User $user, string $absoluteUrl): void
+    {
+        $pendingEmail = $user->getPendingEmail();
+        if (null === $pendingEmail) {
+            return;
+        }
+
+        $this->send($pendingEmail, 'Confirm your new email address', 'email/email_change.html.twig', $absoluteUrl);
+    }
+
+    private function send(string $recipient, string $subject, string $template, string $absoluteUrl): void
     {
         $email = (new TemplatedEmail())
             ->from(new Address($this->fromEmail, $this->fromName))
-            ->to($user->getEmail())
+            ->to($recipient)
             ->subject($subject)
             ->htmlTemplate($template)
             ->context(['absolute_url' => $absoluteUrl])

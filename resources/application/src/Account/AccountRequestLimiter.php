@@ -20,6 +20,8 @@ final readonly class AccountRequestLimiter
         private RateLimiterFactoryInterface $passwordResetLimiter,
         #[Autowire(service: 'limiter.account_verification_resend')]
         private RateLimiterFactoryInterface $verificationResendLimiter,
+        #[Autowire(service: 'limiter.account_email_change')]
+        private RateLimiterFactoryInterface $emailChangeLimiter,
     ) {
     }
 
@@ -41,6 +43,11 @@ final readonly class AccountRequestLimiter
     public function verificationResend(Request $request, string $email): bool
     {
         return $this->accept($this->verificationResendLimiter, $request, $email);
+    }
+
+    public function emailChange(Request $request, string $email): bool
+    {
+        return $this->accept($this->emailChangeLimiter, $request, $email);
     }
 
     private function accept(RateLimiterFactoryInterface $factory, Request $request, string $email): bool
