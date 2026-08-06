@@ -33,6 +33,48 @@ final class LocaleResourcesTest extends TestCase
         self::assertStringContainsString('$this->localeSwitcher->setLocale($locale)', $source);
     }
 
+    public function testLocaleControllerValidatesTheRequestAndSetsASafePersistentCookie(): void
+    {
+        $controller = $this->resource('src/Controller/LocaleController.php');
+
+        self::assertStringContainsString("#[Route('/locale', name: 'app_locale', methods: ['POST'])]", $controller);
+        self::assertStringContainsString("new CsrfToken('locale_change'", $controller);
+        self::assertStringContainsString('Response::HTTP_UNPROCESSABLE_ENTITY', $controller);
+        self::assertStringContainsString("Cookie::create('app_locale')", $controller);
+        self::assertStringContainsString("withExpires(new \\DateTimeImmutable('+1 year'))", $controller);
+        self::assertStringContainsString("withPath('/')", $controller);
+        self::assertStringContainsString('withSecure($request->isSecure())', $controller);
+        self::assertStringContainsString('withHttpOnly(true)', $controller);
+        self::assertStringContainsString('Cookie::SAMESITE_LAX', $controller);
+        self::assertStringContainsString("str_starts_with(\$target, '/')", $controller);
+        self::assertStringContainsString("str_starts_with(\$target, '//')", $controller);
+        self::assertStringContainsString("str_contains(\$target, '\\\\')", $controller);
+    }
+
+    public function testEveryLayoutRendersOneNoJavascriptLanguageSwitcher(): void
+    {
+        $component = $this->resource('templates/components/LanguageSwitcher.html.twig');
+
+        self::assertStringContainsString("path('app_locale')", $component);
+        self::assertStringContainsString('name="locale"', $component);
+        self::assertStringContainsString('supported_locales', $component);
+        self::assertStringContainsString('app.request.locale', $component);
+        self::assertStringContainsString('name="_token"', $component);
+        self::assertStringContainsString("csrf_token('locale_change')", $component);
+        self::assertStringContainsString('name="return_to"', $component);
+        self::assertStringContainsString('value="{{ app.request.requestUri }}"', $component);
+        self::assertStringContainsString("'Apply'|trans", $component);
+        self::assertStringNotContainsString('data-controller', $component);
+
+        foreach (['public', 'auth', 'app'] as $layout) {
+            self::assertSame(
+                1,
+                substr_count($this->resource('templates/layout/'.$layout.'.html.twig'), '<twig:LanguageSwitcher />'),
+                $layout,
+            );
+        }
+    }
+
     #[PreserveGlobalState(false)]
     #[RunInSeparateProcess]
     public function testLocaleResolverPrefersUserThenCookieThenRequestLanguageThenDefault(): void

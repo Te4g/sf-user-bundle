@@ -35,7 +35,9 @@ final class UserInterfaceResourcesTest extends TestCase
         foreach ([
             'src/Controller/HomeController.php',
             'src/Controller/DashboardController.php',
+            'src/Controller/LocaleController.php',
             'templates/base.html.twig',
+            'templates/components/LanguageSwitcher.html.twig',
             'templates/layout/public.html.twig',
             'templates/layout/auth.html.twig',
             'templates/layout/app.html.twig',

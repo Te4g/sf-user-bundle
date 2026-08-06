@@ -117,6 +117,7 @@ final class PersistenceResourcesTest extends TestCase
             "'app_verify_email'",
             "'app_verify_resend'",
             "'app_login_link_check'",
+            "'app_locale'",
             "'app_logout'",
         ] as $route) {
             self::assertStringContainsString($route, $source);

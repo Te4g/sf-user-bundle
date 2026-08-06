@@ -20,6 +20,7 @@ final readonly class VerifiedAccountSubscriber implements EventSubscriberInterfa
         'app_verify_email',
         'app_verify_resend',
         'app_login_link_check',
+        'app_locale',
         'app_logout',
     ];
 

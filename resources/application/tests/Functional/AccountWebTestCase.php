@@ -42,11 +42,13 @@ abstract class AccountWebTestCase extends WebTestCase
         string $email,
         bool $verified = true,
         string $password = 'password',
+        string $locale = 'en',
     ): User {
         $user = (new User())
             ->setName('Test User')
             ->setEmail($email)
             ->setVerified($verified)
+            ->setLocale($locale)
         ;
 
         $hasher = static::getContainer()->get(UserPasswordHasherInterface::class);

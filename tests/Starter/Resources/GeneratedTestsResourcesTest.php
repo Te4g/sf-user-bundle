@@ -26,6 +26,7 @@ final class GeneratedTestsResourcesTest extends TestCase
             'PasswordResetTest.php',
             'AccountSettingsTest.php',
             'SecurityBoundaryTest.php',
+            'LocalePreferenceTest.php',
         ] as $name) {
             self::assertArrayHasKey('tests/Functional/'.$name, $files);
         }
@@ -52,10 +53,11 @@ final class GeneratedTestsResourcesTest extends TestCase
         $helper = $this->resource('tests/Functional/AccountWebTestCase.php');
 
         self::assertStringContainsString('function createUser(', $helper);
-        self::assertStringContainsString("string \$email,\n        bool \$verified = true,\n        string \$password = 'password',", $helper);
+        self::assertStringContainsString("string \$email,\n        bool \$verified = true,\n        string \$password = 'password',\n        string \$locale = 'en',", $helper);
         self::assertStringContainsString('UserPasswordHasherInterface::class', $helper);
         self::assertStringContainsString('hashPassword($user, $password)', $helper);
         self::assertStringContainsString('->setVerified($verified)', $helper);
+        self::assertStringContainsString('->setLocale($locale)', $helper);
         self::assertStringContainsString('persist($user)', $helper);
         self::assertStringContainsString('flush()', $helper);
         self::assertStringContainsString("createQuery('DELETE FROM '.ResetPasswordRequest::class)", $helper);
@@ -218,6 +220,13 @@ final class GeneratedTestsResourcesTest extends TestCase
                 'testEmailAddressSubmissionEndpointsHaveNeutralKnownAndUnknownResponses',
                 'testSubmittedPasswordsAreAbsentFromResponsesAndApplicationLogs',
             ],
+            'LocalePreferenceTest.php' => [
+                'testBrowserCookieAndEnglishFallbackResolveInOrder',
+                'testAuthenticatedPreferenceOverridesCookieAndPersistsAChange',
+                'testLocaleChangeRejectsInvalidCsrfAndUnsupportedLocales',
+                'testLocaleChangeRejectsExternalAndBackslashReturnTargets',
+                'testRegistrationPersistsTheResolvedLocale',
+            ],
         ] as $file => $expectedMethods) {
             $methods = $this->methodNames($this->resource('tests/Functional/'.$file));
             foreach ($expectedMethods as $method) {
@@ -233,6 +242,7 @@ final class GeneratedTestsResourcesTest extends TestCase
                 'PasswordResetTest.php',
                 'AccountSettingsTest.php',
                 'SecurityBoundaryTest.php',
+                'LocalePreferenceTest.php',
             ],
         ));
 
@@ -254,6 +264,7 @@ final class GeneratedTestsResourcesTest extends TestCase
             'app_account_password',
             'app_account_email_verify',
             'app_account_delete',
+            'app_locale',
             'app_home',
         ] as $route) {
             self::assertStringContainsString("'".$route."'", $suite, $route);
@@ -274,6 +285,9 @@ final class GeneratedTestsResourcesTest extends TestCase
             'delete_account[currentPassword]',
             'delete_account[confirm]',
             '_csrf_token',
+            'locale',
+            '_token',
+            'return_to',
         ] as $field) {
             self::assertStringContainsString($field, $suite, $field);
         }

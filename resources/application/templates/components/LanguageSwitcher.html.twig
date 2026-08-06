@@ -1,0 +1,13 @@
+<form method="post" action="{{ path('app_locale') }}" class="flex items-end gap-2">
+    <div class="grid gap-1">
+        <label for="language-switcher-locale" class="text-xs font-medium text-muted-foreground">{{ 'Language'|trans }}</label>
+        <select id="language-switcher-locale" name="locale" class="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50">
+            {% for locale, label in supported_locales %}
+                <option value="{{ locale }}"{% if locale == app.request.locale %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <input type="hidden" name="_token" value="{{ csrf_token('locale_change') }}">
+    <input type="hidden" name="return_to" value="{{ app.request.requestUri }}">
+    <twig:Button type="submit" variant="outline" size="sm">{{ 'Apply'|trans }}</twig:Button>
+</form>
