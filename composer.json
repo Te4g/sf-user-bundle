@@ -8,12 +8,12 @@
     ],
     "autoload": {
         "psr-4": {
-            "Te4g\\Starter\\": "src/Starter/",
-            "Te4g\\UserBundle\\": "src/"
+            "Te4g\\Starter\\": "src/Starter/"
         }
     },
     "autoload-dev": {
         "psr-4": {
+            "Te4g\\UserBundle\\": "src/",
             "Te4g\\Starter\\Tests\\": "tests/Starter/",
             "Te4g\\UserBundle\\Tests\\": "tests/",
             "Te4g\\UserBundle\\Tools\\": "tools/"
@@ -27,19 +27,31 @@
     ],
     "require": {
         "php": "^8.4",
-        "ext-mbstring": "*",
+        "ext-dom": "*",
+        "symfony/console": "^8.1",
+        "symfony/filesystem": "^8.1",
+        "symfony/process": "^8.1",
+        "symfony/yaml": "^8.1",
+        "twig/twig": "^3.24"
+    },
+    "require-dev": {
         "doctrine/doctrine-bundle": "^3.3",
         "doctrine/doctrine-migrations-bundle": "^3.4 || ^4.0",
         "doctrine/orm": "^3.4.4",
+        "ext-mbstring": "*",
+        "friendsofphp/php-cs-fixer": "^3.95",
+        "phpstan/phpstan": "^2.2",
+        "phpunit/phpunit": "^12.5",
         "psr/log": "^3.0",
         "symfony/asset": "^8.1",
         "symfony/asset-mapper": "^8.1",
         "symfony/cache": "^8.1",
         "symfony/config": "^8.1",
-        "symfony/console": "^8.1",
         "symfony/dependency-injection": "^8.1",
         "symfony/event-dispatcher": "^8.1",
-        "symfony/filesystem": "^8.1",
+        "symfony/browser-kit": "^8.1",
+        "symfony/css-selector": "^8.1",
+        "symfony/dom-crawler": "^8.1",
         "symfony/form": "^8.1",
         "symfony/framework-bundle": "^8.1",
         "symfony/http-foundation": "^8.1",
@@ -57,22 +69,12 @@
         "symfony/ux-turbo": "^3.3",
         "symfony/ux-twig-component": "^3.3",
         "symfony/validator": "^8.1",
-        "symfony/yaml": "^8.1",
-        "symfony/process": "^8.1",
         "symfonycasts/reset-password-bundle": "^1.25",
         "symfonycasts/tailwind-bundle": "^1.0",
         "symfonycasts/verify-email-bundle": "^1.18",
         "tales-from-a-dev/twig-tailwind-extra": "^1.0",
         "twig/extra-bundle": "^3.24",
-        "twig/html-extra": "^3.24"
-    },
-    "require-dev": {
-        "friendsofphp/php-cs-fixer": "^3.95",
-        "phpstan/phpstan": "^2.2",
-        "phpunit/phpunit": "^12.5",
-        "symfony/browser-kit": "^8.1",
-        "symfony/css-selector": "^8.1",
-        "symfony/dom-crawler": "^8.1",
+        "twig/html-extra": "^3.24",
         "symfony/stopwatch": "^8.1",
         "symfony/ux-toolkit": "^3.3"
     }

@@ -12,6 +12,7 @@ use Psr\Cache\CacheItemPoolInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\HttpFoundation\Session\SessionInterface;
 use Symfony\Component\Mime\Email;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
@@ -111,13 +112,17 @@ abstract class AccountWebTestCase extends WebTestCase
         self::assertInstanceOf(CsrfTokenManagerInterface::class, $csrf);
         $requestStack = static::getContainer()->get(RequestStack::class);
         self::assertInstanceOf(RequestStack::class, $requestStack);
-        $requestStack->push($this->client->getRequest());
+        $session = $this->client->getSession();
+        self::assertInstanceOf(SessionInterface::class, $session);
+        $request = clone $this->client->getRequest();
+        $request->setSession($session);
+        $requestStack->push($request);
         try {
             $token = $csrf->getToken($tokenId)->getValue();
         } finally {
             $requestStack->pop();
         }
-        $this->client->getRequest()->getSession()->save();
+        $session->save();
 
         return $token;
     }

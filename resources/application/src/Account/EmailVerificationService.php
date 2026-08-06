@@ -7,6 +7,7 @@ namespace App\Account;
 use App\Entity\User;
 use App\Mailer\AccountMailer;
 use App\Repository\UserRepository;
+use Symfony\Component\HttpFoundation\Request;
 use SymfonyCasts\Bundle\VerifyEmail\Exception\VerifyEmailExceptionInterface;
 use SymfonyCasts\Bundle\VerifyEmail\VerifyEmailHelperInterface;
 
@@ -36,7 +37,7 @@ final readonly class EmailVerificationService
         $this->mailer->sendVerification($user, $signature->getSignedUrl());
     }
 
-    public function verify(string $signedUri, int $userId): User
+    public function verify(Request $request, int $userId): User
     {
         $user = $this->users->find($userId);
         if (!$user instanceof User) {
@@ -44,7 +45,7 @@ final readonly class EmailVerificationService
         }
 
         try {
-            $this->verifyEmailHelper->validateEmailConfirmation($signedUri, (string) $userId, $user->getEmail());
+            $this->verifyEmailHelper->validateEmailConfirmationFromRequest($request, (string) $userId, $user->getEmail());
         } catch (VerifyEmailExceptionInterface) {
             throw new \RuntimeException('Email verification failed.');
         }

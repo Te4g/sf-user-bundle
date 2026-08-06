@@ -41,7 +41,7 @@ final class RuntimeDependencySetTest extends TestCase
         ], RuntimeDependencySet::runtime());
         self::assertSame([
             'symfony/maker-bundle:^1.64',
-            'symfony/test-pack:^2.0',
+            'symfony/test-pack:^1.2',
         ], RuntimeDependencySet::development());
         self::assertNotContains('te4g/starter', RuntimeDependencySet::runtime());
     }

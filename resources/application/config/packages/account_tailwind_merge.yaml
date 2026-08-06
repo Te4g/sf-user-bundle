@@ -1,0 +1,5 @@
+services:
+    TalesFromADev\Twig\Extra\Tailwind\TailwindExtension:
+        tags: ['twig.extension']
+    TalesFromADev\Twig\Extra\Tailwind\TailwindRuntime:
+        tags: ['twig.runtime']

@@ -44,7 +44,7 @@ final class RuntimeDependencySet
     {
         return [
             'symfony/maker-bundle:^1.64',
-            'symfony/test-pack:^2.0',
+            'symfony/test-pack:^1.2',
         ];
     }
 }

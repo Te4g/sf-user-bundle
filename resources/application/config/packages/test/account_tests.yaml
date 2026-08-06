@@ -1,4 +1,6 @@
 framework:
+    mailer:
+        message_bus: false
     cache:
         pools:
             cache.account_test_rate_limiter:

@@ -70,7 +70,7 @@ final class ProfileController extends AbstractController
                 throw new \RuntimeException('Account update failed.');
             }
 
-            $this->profile->confirmEmailChange($request->getUri(), $id);
+            $this->profile->confirmEmailChange($request, $id);
 
             return $this->redirectToRoute('app_account');
         } catch (\RuntimeException) {

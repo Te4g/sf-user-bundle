@@ -47,6 +47,27 @@ final class ReplacementPolicyTest extends TestCase
         self::assertTrue($plan->writes()[0]->isReplacement());
     }
 
+    public function testRecognizedFreshResetPasswordRecipeBaselineIsReplaceable(): void
+    {
+        $layout = $this->layout();
+        $path = $layout->path('config/packages/reset_password.yaml');
+        self::assertTrue(mkdir(dirname($path), 0700, true));
+        self::assertNotFalse(file_put_contents($path, <<<'YAML'
+symfonycasts_reset_password:
+    # Replace symfonycasts.reset_password.fake_request_repository with the full
+    # namespace of the password reset request repository after it has been created.
+    # i.e. App\Repository\ResetPasswordRequestRepository
+    request_password_repository: symfonycasts.reset_password.fake_request_repository
+YAML."\n"));
+
+        $plan = $this->policy()->plan($layout, [
+            'config/packages/reset_password.yaml' => $this->generatedSecurityPath(),
+        ]);
+
+        self::assertSame([], $plan->conflicts());
+        self::assertTrue($plan->writes()[0]->isReplacement());
+    }
+
     public function testUnknownExistingFileIsAnExactConflict(): void
     {
         $layout = $this->layout();

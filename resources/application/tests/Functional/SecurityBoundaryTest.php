@@ -318,7 +318,12 @@ final class SecurityBoundaryTest extends AccountWebTestCase
     private function submitEmailForm(string $pageRoute, string $actionRoute, string $email): array
     {
         $crawler = $this->client->request('GET', $this->url($pageRoute));
-        $form = $crawler->filter('form[action="'.$this->url($actionRoute).'"]')->form([
+        $formNodes = $crawler->filter('form[action="'.$this->url($actionRoute).'"]');
+        if (0 === $formNodes->count()) {
+            $formNodes = $crawler->filter('form:not([action])');
+        }
+        self::assertCount(1, $formNodes);
+        $form = $formNodes->form([
             'form[email]' => $email,
         ]);
         $this->client->submit($form);

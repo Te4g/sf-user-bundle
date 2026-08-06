@@ -18,6 +18,7 @@ final class SelfAdministrationResourcesTest extends TestCase
         self::assertStringContainsString('setPendingEmail($normalized)', $source);
         self::assertStringContainsString("generateSignature(\n            'app_account_email_verify'", $source);
         self::assertStringContainsString('function confirmEmailChange(', $source);
+        self::assertStringContainsString('validateEmailConfirmationFromRequest($request', $source);
         self::assertStringContainsString('findOneByNormalizedEmail($pendingEmail)', $source);
         self::assertStringContainsString('promotePendingEmail($userId, $pendingEmail)', $source);
         self::assertStringContainsString('catch (UniqueConstraintViolationException)', $source);

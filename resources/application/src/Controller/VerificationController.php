@@ -47,7 +47,7 @@ final class VerificationController extends AbstractController
         }
 
         try {
-            $this->verification->verify($request->getUri(), (int) $id);
+            $this->verification->verify($request, (int) $id);
         } catch (\RuntimeException) {
             return $this->redirectToRoute('app_login');
         }
