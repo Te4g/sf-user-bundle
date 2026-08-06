@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Te4g\Starter\Tests\Project;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Yaml\Yaml;
 use Te4g\Starter\Exception\InvalidProject;
 use Te4g\Starter\Project\Conflict;
 use Te4g\Starter\Project\PreflightReport;
@@ -68,6 +70,82 @@ final class ProjectInspectorTest extends TestCase
         $report = (new ProjectInspector('8.4.12', '8.1.2'))->inspect($this->layout('default-security'));
 
         self::assertTrue($report->isCompatible());
+    }
+
+    /** @param array<string, array<string, bool|string>> $firewalls */
+    #[DataProvider('exactDefaultFirewalls')]
+    public function testOnlyAnExactCapturedDefaultFirewallMapIsCompatible(array $firewalls): void
+    {
+        $report = (new ProjectInspector('8.4.12', '8.1.2'))->inspect($this->securityLayout($firewalls));
+
+        self::assertTrue($report->isCompatible());
+    }
+
+    /** @return iterable<string, array{array<string, array<string, bool|string>>}> */
+    public static function exactDefaultFirewalls(): iterable
+    {
+        yield 'legacy Symfony baseline' => [[
+            'dev' => [
+                'pattern' => '^/(_(profiler|wdt)|css|images|js)/',
+                'security' => false,
+            ],
+            'main' => ['lazy' => true],
+        ]];
+        yield 'current Symfony baseline in a different associative order' => [[
+            'main' => [
+                'provider' => 'users_in_memory',
+                'lazy' => true,
+            ],
+            'dev' => [
+                'security' => false,
+                'pattern' => '^/(_profiler|_wdt|assets|build)/',
+            ],
+        ]];
+    }
+
+    /** @param array<string, array<string, bool|string>> $firewalls */
+    #[DataProvider('nonDefaultFirewallMaps')]
+    public function testHybridPartialOrExtendedFirewallMapsAreRejected(array $firewalls): void
+    {
+        $report = (new ProjectInspector('8.4.12', '8.1.2'))->inspect($this->securityLayout($firewalls));
+
+        self::assertSame([
+            'config/packages/security.yaml: a non-default security firewall is already configured',
+        ], array_map(static fn (Conflict $conflict): string => $conflict->message(), $report->conflicts()));
+    }
+
+    /** @return iterable<string, array{array<string, array<string, bool|string>>}> */
+    public static function nonDefaultFirewallMaps(): iterable
+    {
+        $legacyDev = [
+            'pattern' => '^/(_(profiler|wdt)|css|images|js)/',
+            'security' => false,
+        ];
+        $currentDev = [
+            'pattern' => '^/(_profiler|_wdt|assets|build)/',
+            'security' => false,
+        ];
+        $legacyMain = ['lazy' => true];
+        $currentMain = ['lazy' => true, 'provider' => 'users_in_memory'];
+
+        yield 'legacy dev with current main' => [['dev' => $legacyDev, 'main' => $currentMain]];
+        yield 'current dev with legacy main' => [['dev' => $currentDev, 'main' => $legacyMain]];
+        yield 'main only' => [['main' => $currentMain]];
+        yield 'dev only' => [['dev' => $currentDev]];
+        yield 'empty' => [[]];
+        yield 'missing nested key' => [[
+            'dev' => ['pattern' => '^/(_profiler|_wdt|assets|build)/'],
+            'main' => $currentMain,
+        ]];
+        yield 'extra nested key' => [[
+            'dev' => $currentDev,
+            'main' => ['lazy' => true, 'provider' => 'users_in_memory', 'stateless' => false],
+        ]];
+        yield 'extra firewall' => [[
+            'dev' => $currentDev,
+            'main' => $currentMain,
+            'api' => ['lazy' => true],
+        ]];
     }
 
     public function testReportsAllConflictsInPathSortedOrder(): void
@@ -144,6 +222,19 @@ final class ProjectInspectorTest extends TestCase
         }
 
         return ProjectLayout::discover($root);
+    }
+
+    /** @param array<string, array<string, bool|string>> $firewalls */
+    private function securityLayout(array $firewalls): ProjectLayout
+    {
+        $layout = $this->temporaryLayout('{"require": {"symfony/framework-bundle": "^8.1"}}');
+        $path = $layout->path('config/packages/security.yaml');
+        self::assertTrue(mkdir(dirname($path), 0700, true));
+        self::assertNotFalse(file_put_contents($path, Yaml::dump([
+            'security' => ['firewalls' => $firewalls],
+        ], 5, 4)));
+
+        return $layout;
     }
 
     private function removeDirectory(string $directory): void

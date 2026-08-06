@@ -3,7 +3,6 @@
 set -eu
 
 readonly PROJECT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)"
-readonly TAILWIND_BINARY='/private/tmp/te4g-tailwindcss-macos-arm64-v4.3.3'
 
 fail() {
     printf 'smoke-test: %s\n' "$*" >&2
@@ -21,6 +20,9 @@ case "$VARIANT" in
     skeleton|webapp) ;;
     *) usage ;;
 esac
+
+[ -n "${TE4G_TAILWIND_BINARY:-}" ] || fail 'TE4G_TAILWIND_BINARY must point to a pre-provisioned Tailwind CSS 4.3.3 binary.'
+readonly TAILWIND_BINARY="$TE4G_TAILWIND_BINARY"
 
 smoke_parent="$(CDPATH= cd -- "${TMPDIR:-/tmp}" && pwd -P)"
 smoke_root="$(mktemp -d "${smoke_parent}/te4g-starter-smoke.XXXXXX")"
@@ -51,6 +53,7 @@ require $argv[1]."/vendor/autoload.php";
 echo Te4g\UserBundle\Tests\Fixtures\App\PinnedTailwindBinary::tailwind433()->validate($argv[2]);
 ' "$PROJECT_DIR" "$TAILWIND_BINARY")"
 [ "$validated_tailwind" = "$TAILWIND_BINARY" ] || fail 'Tailwind validation returned an unexpected path.'
+export TE4G_TAILWIND_BINARY="$validated_tailwind"
 
 printf 'Creating a fresh Symfony 8.1 %s application...\n' "$VARIANT"
 composer create-project 'symfony/skeleton:8.1.*' "$APP_DIR" --no-interaction --no-progress
