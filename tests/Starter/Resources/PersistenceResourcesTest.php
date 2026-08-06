@@ -4,8 +4,29 @@ declare(strict_types=1);
 
 namespace Te4g\Starter\Tests\Resources;
 
+use Doctrine\DBAL\DriverManager;
+use Doctrine\ORM\EntityManager;
+use Doctrine\ORM\ORMSetup;
+use Doctrine\ORM\Tools\SchemaTool;
+use Doctrine\Persistence\ManagerRegistry;
+use Doctrine\Persistence\ObjectManager;
 use PHPUnit\Framework\TestCase;
+use Symfony\Bridge\Doctrine\Security\User\EntityUserProvider;
+use Symfony\Bridge\Doctrine\Security\User\UserLoaderInterface;
+use Symfony\Component\HttpFoundation\RateLimiter\RequestRateLimiterInterface;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Process\Process;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
+use Symfony\Component\Security\Core\Exception\BadCredentialsException;
+use Symfony\Component\Security\Core\Exception\TooManyLoginAttemptsAuthenticationException;
+use Symfony\Component\Security\Http\Authenticator\AuthenticatorInterface;
+use Symfony\Component\Security\Http\Authenticator\Passport\Badge\UserBadge;
+use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPassport;
+use Symfony\Component\Security\Http\Event\CheckPassportEvent;
+use Symfony\Component\Security\Http\Event\LoginFailureEvent;
+use Symfony\Component\Security\Http\EventListener\LoginThrottlingListener;
 use Symfony\Component\Yaml\Yaml;
 
 final class PersistenceResourcesTest extends TestCase
@@ -45,6 +66,8 @@ final class PersistenceResourcesTest extends TestCase
         }
 
         $repository = $this->resource('src/Repository/UserRepository.php');
+        self::assertStringContainsString('UserLoaderInterface', $repository);
+        self::assertStringContainsString('loadUserByIdentifier(string $identifier): ?User', $repository);
         self::assertStringContainsString('findOneByNormalizedEmail(string $normalizedEmail): ?User', $repository);
         self::assertStringContainsString('save(User $user, bool $flush = true): void', $repository);
         self::assertStringContainsString('remove(User $user, bool $flush = true): void', $repository);
@@ -58,13 +81,17 @@ final class PersistenceResourcesTest extends TestCase
         $security = $config['security'];
 
         self::assertSame('App\\Entity\\User', $security['providers']['app_user_provider']['entity']['class']);
-        self::assertSame('email', $security['providers']['app_user_provider']['entity']['property']);
+        self::assertArrayNotHasKey('property', $security['providers']['app_user_provider']['entity']);
         self::assertSame([
             'login_path' => 'app_login',
             'check_path' => 'app_login',
             'enable_csrf' => true,
             'default_target_path' => 'app_dashboard',
         ], $security['firewalls']['main']['form_login']);
+        self::assertSame(
+            ['limiter' => 'App\\Security\\LoginRequestRateLimiter'],
+            $security['firewalls']['main']['login_throttling'],
+        );
         self::assertSame([
             'check_route' => 'app_login_link_check',
             'signature_properties' => ['id', 'email', 'password'],
@@ -97,6 +124,91 @@ final class PersistenceResourcesTest extends TestCase
         self::assertStringContainsString("KernelEvents::REQUEST => ['onKernelRequest', -10]", $source);
         self::assertStringContainsString("generate('app_check_email')", $source);
         self::assertStringNotContainsString('ROLE_', $source);
+    }
+
+    public function testEntityProviderLoadsNormalizedEmailThroughApplicationRepositoryOnSQLite(): void
+    {
+        $this->requireApplicationPersistenceClasses();
+
+        $configuration = ORMSetup::createAttributeMetadataConfig([$this->applicationResources().'/src/Entity'], true);
+        $configuration->enableNativeLazyObjects(true);
+        $entityManager = new EntityManager(
+            DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true], $configuration),
+            $configuration,
+        );
+        $userClass = $this->applicationClass('Entity\\User');
+        $metadata = $entityManager->getClassMetadata($userClass);
+        (new SchemaTool($entityManager))->createSchema([$metadata]);
+
+        $registry = $this->createStub(ManagerRegistry::class);
+        $registry->method('getManagerForClass')->willReturn($entityManager);
+        $repository = $this->newApplicationInstance(
+            'Repository\\UserRepository',
+            $registry,
+            $this->newApplicationInstance('Account\\EmailNormalizer'),
+        );
+        self::assertInstanceOf(UserLoaderInterface::class, $repository);
+
+        $user = $this->newApplicationInstance('Entity\\User');
+        (new \ReflectionMethod($user, 'setName'))->invoke($user, 'Owner');
+        (new \ReflectionMethod($user, 'setEmail'))->invoke($user, 'owner@example.com');
+        (new \ReflectionMethod($user, 'setPassword'))->invoke($user, 'hash');
+        (new \ReflectionMethod($repository, 'save'))->invoke($repository, $user);
+
+        self::assertNull($entityManager->createQuery('SELECT u FROM App\\Entity\\User u WHERE u.email = :email')
+            ->setParameter('email', ' Owner@Example.COM ')
+            ->getOneOrNullResult());
+
+        $objectManager = $this->createStub(ObjectManager::class);
+        $objectManager->method('getRepository')->willReturn($repository);
+        $registry->method('getManager')->willReturn($objectManager);
+        $provider = new EntityUserProvider($registry, $userClass);
+
+        self::assertSame($user, $provider->loadUserByIdentifier(' Owner@Example.COM '));
+    }
+
+    public function testSymfonyLoginThrottlingConsumesTheNormalizedApplicationLimiter(): void
+    {
+        $this->requireApplicationPersistenceClasses();
+        $this->requireApplicationClass('src/Security/LoginRequestRateLimiter.php');
+
+        $factory = new RateLimiterFactory([
+            'id' => 'account_login',
+            'policy' => 'sliding_window',
+            'limit' => 5,
+            'interval' => '15 minutes',
+        ], new InMemoryStorage());
+        $limiter = $this->newApplicationInstance(
+            'Security\\LoginRequestRateLimiter',
+            $this->newApplicationInstance('Account\\EmailNormalizer'),
+            $factory,
+        );
+        self::assertInstanceOf(RequestRateLimiterInterface::class, $limiter);
+
+        $request = Request::create('/login', 'POST', server: ['REMOTE_ADDR' => '203.0.113.10']);
+        $requestStack = new RequestStack();
+        $requestStack->push($request);
+        $listener = new LoginThrottlingListener($requestStack, $limiter);
+        $authenticator = $this->createStub(AuthenticatorInterface::class);
+
+        foreach ([' Owner@Example.COM ', 'owner@example.com', 'OWNER@EXAMPLE.COM', "\towner@example.com", 'owner@example.com '] as $identifier) {
+            $passport = new SelfValidatingPassport(new UserBadge($identifier));
+            $listener->checkPassport(new CheckPassportEvent($authenticator, $passport));
+            $listener->onFailedLogin(new LoginFailureEvent(
+                new BadCredentialsException(),
+                $authenticator,
+                $request,
+                null,
+                'main',
+                $passport,
+            ));
+        }
+
+        $this->expectException(TooManyLoginAttemptsAuthenticationException::class);
+        $listener->checkPassport(new CheckPassportEvent(
+            $authenticator,
+            new SelfValidatingPassport(new UserBadge('owner@example.com')),
+        ));
     }
 
     public function testAccountInfrastructureHasNamedLimitersAndOneHourLifetimes(): void
@@ -150,6 +262,35 @@ final class PersistenceResourcesTest extends TestCase
         self::assertIsString($source, $path);
 
         return $source;
+    }
+
+    private function requireApplicationPersistenceClasses(): void
+    {
+        $this->requireApplicationClass('src/Account/EmailNormalizer.php');
+        $this->requireApplicationClass('src/Entity/User.php');
+        $this->requireApplicationClass('src/Repository/UserRepository.php');
+    }
+
+    private function requireApplicationClass(string $path): void
+    {
+        $resource = $this->applicationResources().'/'.$path;
+        self::assertFileExists($resource);
+        require_once $resource;
+    }
+
+    private function newApplicationInstance(string $suffix, mixed ...$arguments): object
+    {
+        $class = $this->applicationClass($suffix);
+        if (!class_exists($class)) {
+            throw new \LogicException(sprintf('Application class "%s" was not loaded.', $class));
+        }
+
+        return (new \ReflectionClass($class))->newInstance(...$arguments);
+    }
+
+    private function applicationClass(string $suffix): string
+    {
+        return 'App\\'.$suffix;
     }
 
     /** @return list<string> */
