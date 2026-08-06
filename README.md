@@ -66,11 +66,10 @@ The companion [symfony-template integration plan](docs/superpowers/plans/2026-08
 
 ## Development
 
-The repository's maintainer test and smoke gates never download Tailwind. Provision the pinned Tailwind CSS 4.3.3 binary and pass its absolute path:
+`make test` does not require a Tailwind binary. The maintainer smoke gate never downloads Tailwind, so provision the pinned Tailwind CSS 4.3.3 binary and pass its absolute path before running it:
 
 ```console
 export TE4G_TAILWIND_BINARY=/absolute/path/to/tailwindcss
-make test
 make smoke
 ```
 
