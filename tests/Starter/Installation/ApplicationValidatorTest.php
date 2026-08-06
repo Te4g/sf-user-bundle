@@ -53,12 +53,13 @@ final class ApplicationValidatorTest extends TestCase
         self::assertSame([
             ['php', 'bin/console', 'lint:container', '--no-interaction'],
             ['php', 'bin/console', 'lint:yaml', 'config', '--no-interaction'],
+            ['php', 'bin/console', 'lint:xliff', 'translations', '--no-interaction'],
             ['php', 'bin/console', 'lint:twig', 'templates', '--no-interaction'],
             ['php', 'bin/console', 'tailwind:build', '--no-interaction'],
             ['php', 'bin/console', 'debug:asset-map', '--no-interaction'],
         ], $runner->commands);
         self::assertSame(
-            array_fill(0, 5, $this->layout()->root()),
+            array_fill(0, 6, $this->layout()->root()),
             array_column($runner->calls, 'cwd'),
         );
         foreach (array_column($runner->calls, 'timeout') as $timeout) {
@@ -80,10 +81,10 @@ final class ApplicationValidatorTest extends TestCase
     public function testSubprocessFailurePreservesPhaseCommandExitCodeAndBothOutputs(): void
     {
         $failure = new ProcessResult(
-            ['php', 'bin/console', 'lint:twig', 'templates', '--no-interaction'],
+            ['php', 'bin/console', 'lint:xliff', 'translations', '--no-interaction'],
             3,
-            'twig stdout',
-            'twig broke',
+            'xliff stdout',
+            'xliff broke',
         );
         $runner = new RecordingProcessRunner(
             ProcessResult::success(),
@@ -93,13 +94,13 @@ final class ApplicationValidatorTest extends TestCase
 
         try {
             (new ApplicationValidator($runner))->validate($this->layout());
-            self::fail('The failed Twig validation should throw.');
+            self::fail('The failed XLIFF validation should throw.');
         } catch (SubprocessFailed $exception) {
-            self::assertSame('Twig validation', $exception->phase());
+            self::assertSame('XLIFF validation', $exception->phase());
             self::assertSame($failure->command(), $exception->command());
             self::assertSame(3, $exception->exitCode());
-            self::assertSame('twig stdout', $exception->stdout());
-            self::assertSame('twig broke', $exception->stderr());
+            self::assertSame('xliff stdout', $exception->stdout());
+            self::assertSame('xliff broke', $exception->stderr());
             self::assertCount(3, $runner->commands);
         }
     }
@@ -114,7 +115,7 @@ final class ApplicationValidatorTest extends TestCase
             self::fail('A missing locked icon should fail validation.');
         } catch (GenerationFailed $exception) {
             self::assertSame('assets/icons/lucide/mail.svg: locked offline icon is missing', $exception->getMessage());
-            self::assertCount(5, $runner->commands);
+            self::assertCount(6, $runner->commands);
         }
     }
 

@@ -1,46 +1,46 @@
 {% extends 'layout/app.html.twig' %}
 
-{% block title %}Account settings · Application{% endblock %}
+{% block title %}{{ 'account.page_title'|trans({'%app_name%': app_name}) }}{% endblock %}
 
 {% block main %}
 <main class="mx-auto w-full max-w-3xl space-y-10 px-4 py-10 sm:px-6">
     <header class="space-y-2">
-        <h1 class="text-3xl font-semibold tracking-tight">Account settings</h1>
-        <p class="text-sm leading-6 text-muted-foreground">Manage your identity, sign-in details, and account access.</p>
+        <h1 class="text-3xl font-semibold tracking-tight">{{ 'account.title'|trans }}</h1>
+        <p class="text-sm leading-6 text-muted-foreground">{{ 'account.copy'|trans }}</p>
     </header>
 
     <section aria-labelledby="account-details-heading" class="space-y-4">
-        <h2 id="account-details-heading" class="text-base font-medium">Account details</h2>
+        <h2 id="account-details-heading" class="text-base font-medium">{{ 'account.details'|trans }}</h2>
         <dl class="divide-y divide-border border-y border-border text-sm">
             <div class="grid gap-1 py-4 sm:grid-cols-[12rem_1fr]">
-                <dt class="text-muted-foreground">Name</dt>
+                <dt class="text-muted-foreground">{{ 'form.name'|trans }}</dt>
                 <dd>{{ account.name }}</dd>
             </div>
             <div class="grid gap-1 py-4 sm:grid-cols-[12rem_1fr]">
-                <dt class="text-muted-foreground">Email address</dt>
+                <dt class="text-muted-foreground">{{ 'account.active_email'|trans }}</dt>
                 <dd data-account-active-email>{{ account.email }}</dd>
             </div>
             {% if account.pendingEmail %}
                 <div class="grid gap-1 py-4 sm:grid-cols-[12rem_1fr]">
-                    <dt class="text-muted-foreground">Pending email</dt>
+                    <dt class="text-muted-foreground">{{ 'account.pending_email'|trans }}</dt>
                     <dd data-account-pending-email>{{ account.pendingEmail }}</dd>
                 </div>
             {% endif %}
         </dl>
     </section>
 
-    <nav aria-label="Account settings" class="divide-y divide-border border-y border-border">
+    <nav aria-label="{{ 'account.navigation'|trans }}" class="divide-y divide-border border-y border-border">
         <div class="flex flex-col items-start justify-between gap-4 py-5 sm:flex-row sm:items-center">
-            <div><h2 class="font-medium">Profile</h2><p class="mt-1 text-sm text-muted-foreground">Update your name or request an email change.</p></div>
-            <twig:Button as="a" href="{{ path('app_account_profile') }}" variant="outline">Edit profile</twig:Button>
+            <div><h2 class="font-medium">{{ 'account.profile_title'|trans }}</h2><p class="mt-1 text-sm text-muted-foreground">{{ 'account.profile_copy'|trans }}</p></div>
+            <twig:Button as="a" href="{{ path('app_account_profile') }}" variant="outline">{{ 'account.profile_action'|trans }}</twig:Button>
         </div>
         <div class="flex flex-col items-start justify-between gap-4 py-5 sm:flex-row sm:items-center">
-            <div><h2 class="font-medium">Password</h2><p class="mt-1 text-sm text-muted-foreground">Choose a new password for your account.</p></div>
-            <twig:Button as="a" href="{{ path('app_account_password') }}" variant="outline"><twig:ux:icon name="lucide:key-round" />Change password</twig:Button>
+            <div><h2 class="font-medium">{{ 'account.password_title'|trans }}</h2><p class="mt-1 text-sm text-muted-foreground">{{ 'account.password_copy'|trans }}</p></div>
+            <twig:Button as="a" href="{{ path('app_account_password') }}" variant="outline"><twig:ux:icon name="lucide:key-round" />{{ 'account.password_action'|trans }}</twig:Button>
         </div>
         <div class="flex flex-col items-start justify-between gap-4 py-5 sm:flex-row sm:items-center">
-            <div><h2 class="font-medium text-destructive">Delete account</h2><p class="mt-1 text-sm text-muted-foreground">Permanently remove your account and its data.</p></div>
-            <twig:Button as="a" href="{{ path('app_account_delete') }}" variant="destructive">Delete account</twig:Button>
+            <div><h2 class="font-medium text-destructive">{{ 'account.delete_title'|trans }}</h2><p class="mt-1 text-sm text-muted-foreground">{{ 'account.delete_copy'|trans }}</p></div>
+            <twig:Button as="a" href="{{ path('app_account_delete') }}" variant="destructive">{{ 'account.delete_submit'|trans }}</twig:Button>
         </div>
     </nav>
 </main>

@@ -1,13 +1,13 @@
 {% extends 'layout/app.html.twig' %}
 
-{% block title %}Profile · Application{% endblock %}
+{% block title %}{{ 'profile.page_title'|trans({'%app_name%': app_name}) }}{% endblock %}
 
 {% block main %}
 <main class="mx-auto w-full max-w-2xl px-4 py-10 sm:px-6">
     <twig:Card>
         <twig:Card:Header>
-            <twig:Card:Title><h1 class="text-xl">Profile</h1></twig:Card:Title>
-            <twig:Card:Description>Update your name or request a change to {{ account.email }}.</twig:Card:Description>
+            <twig:Card:Title><h1 class="text-xl">{{ 'profile.title'|trans }}</h1></twig:Card:Title>
+            <twig:Card:Description>{{ 'profile.copy'|trans({'%email%': account.email}) }}</twig:Card:Description>
         </twig:Card:Header>
         <twig:Card:Content>
             {{ form_start(form, {attr: {class: 'space-y-5'}}) }}
@@ -25,13 +25,13 @@
                 <twig:Field>
                     <twig:Field:Label for="{{ form.email.vars.id }}" class="{{ form.email.vars.required ? 'required' : '' }}">{{ form.email.vars.label|trans(form.email.vars.label_translation_parameters, form.email.vars.translation_domain) }}</twig:Field:Label>
                     {{ form_widget(form.email, {attr: {'aria-describedby': 'profile-email-help ' ~ form.email.vars.id ~ '_errors'}}) }}
-                    <twig:Field:Description id="profile-email-help">A confirmation link is sent before your email address changes.</twig:Field:Description>
+                    <twig:Field:Description id="profile-email-help">{{ 'profile.email_help'|trans }}</twig:Field:Description>
                     {{ form_errors(form.email) }}
                 </twig:Field>
                 {{ form_rest(form) }}
                 <div class="flex flex-wrap gap-3">
-                    <twig:Button type="submit" data-turbo-submits-with="{{ 'form.submitting'|trans }}">Save profile</twig:Button>
-                    <twig:Button as="a" href="{{ path('app_account') }}" variant="ghost">Cancel</twig:Button>
+                    <twig:Button type="submit" data-turbo-submits-with="{{ 'form.submitting'|trans }}">{{ 'profile.submit'|trans }}</twig:Button>
+                    <twig:Button as="a" href="{{ path('app_account') }}" variant="ghost">{{ 'common.cancel'|trans }}</twig:Button>
                 </div>
             {{ form_end(form, {render_rest: false}) }}
         </twig:Card:Content>

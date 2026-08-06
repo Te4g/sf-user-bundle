@@ -24,6 +24,10 @@ final readonly class ApplicationValidator
             'command' => ['php', 'bin/console', 'lint:yaml', 'config', '--no-interaction'],
         ],
         [
+            'phase' => 'XLIFF validation',
+            'command' => ['php', 'bin/console', 'lint:xliff', 'translations', '--no-interaction'],
+        ],
+        [
             'phase' => 'Twig validation',
             'command' => ['php', 'bin/console', 'lint:twig', 'templates', '--no-interaction'],
         ],

@@ -18,6 +18,50 @@ use Twig\TwigFunction;
 
 final class UserInterfaceResourcesTest extends TestCase
 {
+    private const array RETIRED_VISIBLE_ENGLISH = [
+        'Application · Welcome',
+        'Dashboard · Application',
+        'Account settings · Application',
+        'Profile · Application',
+        'Delete account · Application',
+        'A thoughtful Symfony starting point',
+        'Your account foundation is ready.',
+        'Create an account or sign in to continue to the application.',
+        'Open dashboard',
+        'This is your authenticated application shell.',
+        'Your workspace is ready',
+        'There is nothing here yet.',
+        'Open account settings',
+        'Manage your identity, sign-in details, and account access.',
+        'Account details',
+        '>Name<',
+        '>Email address<',
+        '>Pending email<',
+        '>Dashboard<',
+        '>Account<',
+        '>Sign in<',
+        '>Create account<',
+        '>Profile<',
+        '>Password<',
+        '>Delete account<',
+        'Update your name or request an email change.',
+        'Edit profile',
+        'Choose a new password for your account.',
+        'Permanently remove your account and its data.',
+        'Permanently remove {{ account.email }} and its account data.',
+        'A confirmation link is sent before your email address changes.',
+        'Save profile',
+        '>Cancel<',
+        'Delete your account permanently?',
+        'This action cannot be undone.',
+        'Keep account',
+        'Return to sign in',
+        'Back home',
+        '>Sign out<',
+        'Primary navigation',
+        'Account navigation',
+    ];
+
     private const array ICONS = [
         'circle-check',
         'eye',
@@ -167,6 +211,17 @@ final class UserInterfaceResourcesTest extends TestCase
 
         $password = $this->resource('templates/account/password.html.twig');
         self::assertStringNotContainsString('password_change_failed', $password);
+    }
+
+    public function testTemplatesDoNotContainRetiredVisibleEnglishCopy(): void
+    {
+        foreach ($this->templateResources() as $path) {
+            $source = $this->contents($path);
+
+            foreach (self::RETIRED_VISIBLE_ENGLISH as $retiredCopy) {
+                self::assertStringNotContainsString($retiredCopy, $source, $path.' '.$retiredCopy);
+            }
+        }
     }
 
     public function testFinalFormsDeclareAccessibleLabelsAndUseTheirRenderedErrorIds(): void

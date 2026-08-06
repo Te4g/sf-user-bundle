@@ -3,10 +3,10 @@
 {% block body %}
     <header class="border-b border-border/80">
         <div class="mx-auto flex min-h-16 w-full max-w-md items-center justify-between gap-4 px-4">
-            <a href="{{ path('app_home') }}" class="rounded-md font-semibold tracking-tight outline-none focus-visible:ring-3 focus-visible:ring-ring/50">Application</a>
+            <a href="{{ path('app_home') }}" class="rounded-md font-semibold tracking-tight outline-none focus-visible:ring-3 focus-visible:ring-ring/50">{{ app_name }}</a>
             <div class="flex items-center gap-3">
                 <twig:LanguageSwitcher />
-                <a href="{{ path('app_home') }}" class="rounded-md text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50">Back home</a>
+                <a href="{{ path('app_home') }}" class="rounded-md text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50">{{ 'navigation.back_home'|trans }}</a>
             </div>
         </div>
     </header>

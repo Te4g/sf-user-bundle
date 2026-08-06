@@ -1,22 +1,22 @@
 {% extends 'layout/public.html.twig' %}
 
-{% block title %}Application · Welcome{% endblock %}
+{% block title %}{{ 'home.title'|trans({'%app_name%': app_name}) }}{% endblock %}
 
 {% block main %}
 <main>
     <section class="mx-auto flex min-h-[calc(100svh-4rem)] w-full max-w-6xl items-center px-4 py-20 sm:px-6 lg:px-8">
         <div class="max-w-3xl space-y-8">
-            <p class="text-sm font-medium text-primary">A thoughtful Symfony starting point</p>
+            <p class="text-sm font-medium text-primary">{{ 'home.eyebrow'|trans }}</p>
             <div class="space-y-4">
-                <h1 class="max-w-2xl text-4xl font-semibold tracking-tight text-balance sm:text-6xl">Your account foundation is ready.</h1>
-                <p class="max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">Create an account or sign in to continue to the application.</p>
+                <h1 class="max-w-2xl text-4xl font-semibold tracking-tight text-balance sm:text-6xl">{{ 'home.heading'|trans }}</h1>
+                <p class="max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">{{ 'home.copy'|trans }}</p>
             </div>
             <div class="flex flex-wrap gap-3">
                 {% if app.user %}
-                    <twig:Button as="a" href="{{ path('app_dashboard') }}" size="lg">Open dashboard</twig:Button>
+                    <twig:Button as="a" href="{{ path('app_dashboard') }}" size="lg">{{ 'home.open_dashboard'|trans }}</twig:Button>
                 {% else %}
-                    <twig:Button as="a" href="{{ path('app_register') }}" size="lg">Create account</twig:Button>
-                    <twig:Button as="a" href="{{ path('app_login') }}" variant="outline" size="lg">Sign in</twig:Button>
+                    <twig:Button as="a" href="{{ path('app_register') }}" size="lg">{{ 'navigation.register'|trans }}</twig:Button>
+                    <twig:Button as="a" href="{{ path('app_login') }}" variant="outline" size="lg">{{ 'navigation.sign_in'|trans }}</twig:Button>
                 {% endif %}
             </div>
         </div>

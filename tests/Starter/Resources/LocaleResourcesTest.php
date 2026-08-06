@@ -63,7 +63,8 @@ final class LocaleResourcesTest extends TestCase
         self::assertStringContainsString("csrf_token('locale_change')", $component);
         self::assertStringContainsString('name="return_to"', $component);
         self::assertStringContainsString('value="{{ app.request.requestUri }}"', $component);
-        self::assertStringContainsString("'Apply'|trans", $component);
+        self::assertStringContainsString("'locale.label'|trans", $component);
+        self::assertStringContainsString("'locale.apply'|trans", $component);
         self::assertStringNotContainsString('data-controller', $component);
 
         foreach (['public', 'auth', 'app'] as $layout) {
@@ -73,6 +74,12 @@ final class LocaleResourcesTest extends TestCase
                 $layout,
             );
         }
+    }
+
+    public function testEnglishAndFrenchTranslationCataloguesExposeTheSameKeys(): void
+    {
+        self::assertSame($this->translationIds('messages.en.xlf'), $this->translationIds('messages.fr.xlf'));
+        self::assertSame($this->translationIds('validators.en.xlf'), $this->translationIds('validators.fr.xlf'));
     }
 
     #[PreserveGlobalState(false)]
@@ -109,6 +116,28 @@ final class LocaleResourcesTest extends TestCase
         self::assertIsString($source, $path);
 
         return $source;
+    }
+
+    /** @return list<string> */
+    private function translationIds(string $filename): array
+    {
+        $catalogue = $this->applicationResources().'/translations/'.$filename;
+        self::assertFileExists($catalogue);
+
+        $document = new \DOMDocument();
+        self::assertTrue($document->load($catalogue, LIBXML_NONET), $filename);
+
+        $sources = (new \DOMXPath($document))->query("//*[local-name()='source']");
+        self::assertNotFalse($sources);
+
+        $ids = [];
+        foreach ($sources as $source) {
+            self::assertInstanceOf(\DOMNode::class, $source);
+            $ids[] = $source->textContent;
+        }
+        sort($ids);
+
+        return $ids;
     }
 
     private function requireApplicationClass(string $path): void

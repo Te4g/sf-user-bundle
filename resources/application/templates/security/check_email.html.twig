@@ -9,7 +9,7 @@
 <twig:Field><twig:Field:Label for="{{ resend_form.email.vars.id }}" class="{{ resend_form.email.vars.required ? 'required' : '' }}">{{ resend_form.email.vars.label|trans(resend_form.email.vars.label_translation_parameters, resend_form.email.vars.translation_domain) }}</twig:Field:Label>{{ form_widget(resend_form.email, {attr: {'aria-describedby': resend_form.email.vars.id ~ '_errors'}}) }}{{ form_errors(resend_form.email) }}</twig:Field>
 {{ form_rest(resend_form) }}<twig:Button type="submit" variant="outline" class="w-full" data-turbo-submits-with="{{ 'form.submitting'|trans }}">{{ 'check_email.resend'|trans }}</twig:Button>{{ form_end(resend_form, {render_rest: false}) }}
 {% else %}
-<twig:Button as="a" href="{{ path('app_login') }}" variant="outline" class="w-full">Return to sign in</twig:Button>
+<twig:Button as="a" href="{{ path('app_login') }}" variant="outline" class="w-full">{{ 'check_email.return_login'|trans }}</twig:Button>
 {% endif %}
 </twig:Card:Content></twig:Card></main>
 {% endblock %}

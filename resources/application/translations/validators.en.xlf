@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xliff xmlns="urn:oasis:names:tc:xliff:document:1.2" version="1.2">
+  <file source-language="en" target-language="en" datatype="plaintext" original="file.ext">
+    <body>
+      <trans-unit id="password.mismatch"><source>password.mismatch</source><target>The password fields must match.</target></trans-unit>
+      <trans-unit id="account.delete_confirmation_required"><source>account.delete_confirmation_required</source><target>You must confirm account deletion.</target></trans-unit>
+    </body>
+  </file>
+</xliff>

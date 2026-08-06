@@ -56,6 +56,7 @@ final class InstallCommandTest extends TestCase
             ProcessResult::success(),
             ProcessResult::success(),
             ProcessResult::success(),
+            ProcessResult::success(),
             $failure,
         ));
 
