@@ -108,6 +108,11 @@ printf 'Removing the generator before any database use...\n'
     if rg -n 'Te4g\\|te4g/starter|te4g_user' src config templates assets tests composer.json; then
         fail 'generated application paths still reference the starter package.'
     fi
+    [ -f STARTER_LICENSES.md ] || fail 'generated application lost STARTER_LICENSES.md after package removal.'
+    rg -q 'END OF TERMS AND CONDITIONS' STARTER_LICENSES.md \
+        || fail 'generated application license file does not contain the complete GPL terms.'
+    rg -q 'Lucide Icons and Contributors' STARTER_LICENSES.md \
+        || fail 'generated application license file does not contain the Lucide notice.'
 )
 
 printf 'Validating the independently owned generated application...\n'

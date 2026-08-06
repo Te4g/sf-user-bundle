@@ -18,5 +18,39 @@ final class PackageSurfaceTest extends TestCase
         self::assertSame(['Te4g\\Starter\\' => 'src/Starter/'], $composer['autoload']['psr-4']);
         self::assertDirectoryDoesNotExist(__DIR__.'/../../../flex');
         self::assertFileDoesNotExist(__DIR__.'/../../../src/Te4gUserBundle.php');
+        self::assertFileExists(__DIR__.'/../../../THIRD_PARTY_NOTICES.md');
+    }
+
+    public function testSecurityDocumentationMatchesTheCredentialBearingResetRoute(): void
+    {
+        $controller = file_get_contents(
+            __DIR__.'/../../../resources/application/src/Controller/PasswordResetController.php',
+        );
+        self::assertIsString($controller);
+        $matches = [];
+        if (1 !== preg_match(
+            "/#\[Route\('([^']+)', name: 'app_forgot_password_reset'/",
+            $controller,
+            $matches,
+        )) {
+            self::fail('The generated password-reset route could not be read.');
+        }
+        $resetPath = $matches[1];
+
+        $securityGuide = file_get_contents(__DIR__.'/../../../docs/security.md');
+        self::assertIsString($securityGuide);
+        self::assertStringContainsString('`'.$resetPath.'`', $securityGuide);
+
+        $currentDocumentation = [$securityGuide];
+        $readme = file_get_contents(__DIR__.'/../../../README.md');
+        self::assertIsString($readme);
+        $currentDocumentation[] = $readme;
+        foreach (glob(__DIR__.'/../../../docs/*.md') ?: [] as $path) {
+            $document = file_get_contents($path);
+            self::assertIsString($document, $path);
+            $currentDocumentation[] = $document;
+        }
+
+        self::assertStringNotContainsString('/reset-password/{token}', implode("\n", $currentDocumentation));
     }
 }

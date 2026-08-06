@@ -84,6 +84,27 @@ final class StagedFileWriterTest extends TestCase
         self::assertFileExists($this->layout()->path('src/Entity/User.php'));
     }
 
+    public function testCreatesNestedApplicationDirectoriesWithPortablePermissions(): void
+    {
+        $layout = $this->layout();
+        $previousUmask = umask(0);
+
+        try {
+            $this->writer()->write(
+                $layout,
+                $this->planForResource('src/Account/Example.php', '<?php final class GeneratedExample {}'),
+            );
+        } finally {
+            umask($previousUmask);
+        }
+
+        foreach (['src', 'src/Account'] as $directory) {
+            $path = $layout->path($directory);
+            clearstatcache(true, $path);
+            self::assertSame(0755, fileperms($path) & 0777, $directory);
+        }
+    }
+
     public function testPlannedCreateRefusesACustomFileIntroducedBeforeWriting(): void
     {
         $layout = $this->layout();

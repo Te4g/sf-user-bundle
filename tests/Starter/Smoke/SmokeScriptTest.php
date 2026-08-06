@@ -49,6 +49,9 @@ final class SmokeScriptTest extends TestCase
         self::assertStringContainsString('127.0.0.1:1', $script);
         self::assertStringContainsString('composer remove te4g/starter', $script);
         self::assertStringContainsString('composer config --unset repositories.te4g-starter', $script);
+        self::assertStringContainsString('STARTER_LICENSES.md', $script);
+        self::assertStringContainsString('END OF TERMS AND CONDITIONS', $script);
+        self::assertStringContainsString('Lucide Icons and Contributors', $script);
         self::assertStringContainsString('make:migration', $script);
         self::assertLessThan(
             strpos($script, 'make:migration'),

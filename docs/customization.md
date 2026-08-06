@@ -35,7 +35,7 @@ The starter deliberately generates only two custom Stimulus controllers:
 
 Keep their label, focus, native validation, and dialog semantics when changing markup. Add new Stimulus controllers only for browser-local behavior; use ordinary Symfony requests and Turbo for server work.
 
-Offline icons live in `assets/icons/lucide/`. If you add or replace icons, keep them local, review their license, and update application tests and accessibility labels. The starter's maintainer snapshot tool and manifest describe the original vendored UI provenance; they are not copied into the generated application.
+Offline icons live in `assets/icons/lucide/`. If you add or replace icons, keep them local, review their license, and update application tests and accessibility labels. The generated application-owned `STARTER_LICENSES.md` scopes the license for copied starter resources and preserves the full Symfony UX Toolkit, Lucide, and Feather notices after the starter package is removed. The maintainer snapshot tool and hash manifest remain in the starter repository and are not runtime dependencies.
 
 ## Forms, translations, and tests
 

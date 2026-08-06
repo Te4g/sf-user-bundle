@@ -85,8 +85,11 @@ final class PublicAccountResourcesTest extends TestCase
         self::assertStringContainsString('generateResetToken($user)', $service);
         self::assertStringContainsString('validateTokenAndFetchUser($token)', $service);
         self::assertStringContainsString('hashPassword($user, $plainPassword)', $service);
+        self::assertStringContainsString('wrapInTransaction(', $service);
+        self::assertStringContainsString('save($user, false)', $service);
         self::assertStringContainsString('removeResetRequest($token)', $service);
         self::assertStringContainsString('removeRequests($user)', $service);
+        self::assertStringContainsString('$user->setPassword($currentHash)', $service);
     }
 
     public function testPlainPasswordsAreSensitiveServiceParametersAndStayInFormModels(): void

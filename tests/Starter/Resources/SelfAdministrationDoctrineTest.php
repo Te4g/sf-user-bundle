@@ -14,7 +14,13 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
+use SymfonyCasts\Bundle\ResetPassword\Generator\ResetPasswordRandomGenerator;
+use SymfonyCasts\Bundle\ResetPassword\Generator\ResetPasswordTokenGenerator;
+use SymfonyCasts\Bundle\ResetPassword\ResetPasswordHelper;
+use SymfonyCasts\Bundle\ResetPassword\ResetPasswordHelperInterface;
+use SymfonyCasts\Bundle\ResetPassword\Util\ResetPasswordCleaner;
 use SymfonyCasts\Bundle\VerifyEmail\Model\VerifyEmailSignatureComponents;
 use SymfonyCasts\Bundle\VerifyEmail\VerifyEmailHelperInterface;
 
@@ -96,6 +102,46 @@ final class SelfAdministrationDoctrineTest extends TestCase
         self::assertSame('ORIGINAL_HASH', $this->userValue($stored, 'getPassword'));
     }
 
+    public function testPasswordResetRollsBackTheHashAndPreservesTheTokenWhenCleanupFails(): void
+    {
+        $user = $this->persistedUser('reset-owner@example.com', 'ORIGINAL_HASH');
+        $userId = $this->userId($user);
+        $repository = $this->resetRequestRepository($this->entityManager);
+        self::assertInstanceOf(
+            \SymfonyCasts\Bundle\ResetPassword\Persistence\ResetPasswordRequestRepositoryInterface::class,
+            $repository,
+        );
+        $helper = new ResetPasswordHelper(
+            new ResetPasswordTokenGenerator('test-signing-key', new ResetPasswordRandomGenerator()),
+            new ResetPasswordCleaner($repository, false),
+            $repository,
+            3600,
+            3600,
+        );
+        $token = $helper->generateResetToken($user)->getToken();
+        $this->rejectResetRequestDeletion();
+
+        $failure = null;
+        $service = $this->passwordResetService($helper);
+        try {
+            (new \ReflectionMethod($service, 'reset'))->invoke($service, $token, 'new-password');
+        } catch (\Throwable $exception) {
+            $failure = $exception;
+        }
+
+        self::assertNotNull($failure, 'The database must reject reset-request cleanup.');
+        self::assertSame('ORIGINAL_HASH', $this->userValue($user, 'getPassword'), 'The managed user must be restored after rollback.');
+        $stored = $this->reloadedUser($userId);
+        self::assertSame('ORIGINAL_HASH', $this->userValue($stored, 'getPassword'));
+        self::assertSame(1, $this->resetRequestCount());
+        $reloadedRepository = $this->resetRequestRepository($this->entityManager);
+        self::assertNotNull(
+            (new \ReflectionMethod($reloadedRepository, 'findOneBy'))
+                ->invoke($reloadedRepository, ['selector' => substr($token, 0, 20)]),
+            'The same reset token request must remain persisted after rollback.',
+        );
+    }
+
     public function testEmailPromotionRollsBackWhenResetRequestCleanupFails(): void
     {
         $user = $this->persistedUser('old@example.com', 'ORIGINAL_HASH', 'new@example.com');
@@ -162,6 +208,21 @@ final class SelfAdministrationDoctrineTest extends TestCase
         return $service->newInstanceArgs($arguments);
     }
 
+    private function passwordResetService(ResetPasswordHelperInterface $helper): object
+    {
+        return $this->newApplicationInstance(
+            'Account\\PasswordResetService',
+            $this->userRepository($this->entityManager),
+            $this->newApplicationInstance('Account\\EmailNormalizer'),
+            $helper,
+            $this->resetRequestRepository($this->entityManager),
+            new TransitionPasswordHasher(),
+            $this->createStub(UrlGeneratorInterface::class),
+            $this->newApplicationInstance('Mailer\\AccountMailer', $this->createStub(MailerInterface::class)),
+            $this->entityManager,
+        );
+    }
+
     private function userRepository(EntityManagerInterface $entityManager): object
     {
         $registry = $this->createStub(ManagerRegistry::class);
@@ -187,6 +248,26 @@ final class SelfAdministrationDoctrineTest extends TestCase
         $metadata = $this->entityManager->getClassMetadata($this->applicationClass('Entity\\ResetPasswordRequest'));
         $table = $this->entityManager->getConnection()->quoteSingleIdentifier($metadata->getTableName());
         $this->entityManager->getConnection()->executeStatement('DROP TABLE '.$table);
+    }
+
+    private function rejectResetRequestDeletion(): void
+    {
+        $metadata = $this->entityManager->getClassMetadata($this->applicationClass('Entity\\ResetPasswordRequest'));
+        $table = $this->entityManager->getConnection()->quoteSingleIdentifier($metadata->getTableName());
+        $this->entityManager->getConnection()->executeStatement(
+            "CREATE TRIGGER fail_reset_cleanup BEFORE DELETE ON {$table} "
+            ."BEGIN SELECT RAISE(FAIL, 'cleanup failed'); END",
+        );
+    }
+
+    private function resetRequestCount(): int
+    {
+        $count = $this->entityManager->createQuery(
+            'SELECT COUNT(request.id) FROM '.$this->applicationClass('Entity\\ResetPasswordRequest').' request',
+        )->getSingleScalarResult();
+        self::assertIsInt($count);
+
+        return $count;
     }
 
     private function reloadedUser(int $userId): object
@@ -238,6 +319,7 @@ final class SelfAdministrationDoctrineTest extends TestCase
             'src/Mailer/AccountMailer.php',
             'src/Account/ProfileService.php',
             'src/Account/PasswordService.php',
+            'src/Account/PasswordResetService.php',
         ] as $path) {
             $resource = $this->applicationResources().'/'.$path;
             self::assertFileExists($resource);

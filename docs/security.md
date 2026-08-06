@@ -23,7 +23,7 @@ Email-change requests are available only to authenticated accounts. The active l
 
 The generated login-link subscriber validates the routed POST form's `_csrf_token` before Symfony's authenticator consumes the link. Query-string tokens are ignored. Login and logout use CSRF protection, and logout is POST-only.
 
-Password changes and resets replace the password hash. The generated `User` stores only a `crc32c` fingerprint of that hash in serialized session state, so an existing session is invalidated after the password changes without storing the raw hash. Email and password transitions clear outstanding reset requests. Email confirmation and password changes use Doctrine transactions so related state changes succeed or roll back together.
+Password changes and resets replace the password hash. The generated `User` stores only a `crc32c` fingerprint of that hash in serialized session state, so an existing session is invalidated after the password changes without storing the raw hash. Email and password transitions clear outstanding reset requests. Email confirmation, password changes, and password resets use Doctrine transactions so related state changes succeed or roll back together.
 
 Account deletion verifies the current password, removes the account in a transaction, clears the security token, and invalidates the session. Add application-specific ownership or retention checks directly to `App\Account\AccountDeletionService` before removal. Keep irreversible external side effects outside a transaction unless they are retry-safe.
 
@@ -36,7 +36,7 @@ Configure a production `MAILER_DSN` and `framework.router.default_uri`. Verifica
 Signed URLs and reset paths contain credentials. Configure application, reverse-proxy, CDN/WAF, and APM logging to:
 
 - omit query strings for verification, magic-login, and email-change confirmation links;
-- redact the token segment in `/reset-password/{token}`;
+- redact the token segment in `/forgot-password/reset/{token}`;
 - exclude authentication and account form bodies, including passwords, tokens, and CSRF values;
 - avoid serializing complete request, exception-event, user, or mail objects;
 - treat email addresses as personal data with explicit retention and access policy.
@@ -45,4 +45,4 @@ The generated functional tests install observable request and security loggers t
 
 ## Vendored UI and offline assets
 
-The generated application receives a reviewed Twig component snapshot and seven local Lucide icons. Provenance is recorded in `resources/shadcn/manifest.json` and `THIRD_PARTY_NOTICES.md`. Its TailwindBundle configuration pins `binary_version` to Tailwind CSS 4.3.3. Normal installation follows TailwindBundle's binary behavior and may download that binary when it is not already available. Only this repository's `make smoke` gate requires a caller-provisioned `TE4G_TAILWIND_BINARY` and validates its platform checksum; `make test` does not require the binary.
+The generated application receives a reviewed Twig component snapshot and seven local Lucide icons. Keep its application-owned `STARTER_LICENSES.md`, which identifies the copied resources and preserves their license terms and notices after `te4g/starter` is removed. Maintainer provenance and hashes remain in this package's `resources/shadcn/manifest.json` and `THIRD_PARTY_NOTICES.md`. TailwindBundle configuration pins `binary_version` to Tailwind CSS 4.3.3. Normal installation follows TailwindBundle's binary behavior and may download that binary when it is not already available. Only this repository's `make smoke` gate requires a caller-provisioned `TE4G_TAILWIND_BINARY` and validates its platform checksum; `make test` does not require the binary.
