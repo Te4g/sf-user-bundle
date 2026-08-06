@@ -7,7 +7,7 @@
 - PHP 8.4 or newer
 - a fresh Symfony 8.1 skeleton or Symfony 8.1 webapp project
 - Composer 2 with Symfony Flex
-- an executable Tailwind CSS 4.3.3 standalone binary available to SymfonyCasts TailwindBundle
+- an environment where SymfonyCasts TailwindBundle can provide Tailwind CSS 4.3.3 through its normal binary management or an application-configured binary
 
 The installer accepts the security configuration produced by the current Symfony 8.1 skeleton and webapp recipes. It stops when account files already exist or when `config/packages/security.yaml` has been customized. This is deliberately a fresh-project starter, not an upgrade tool.
 
@@ -66,7 +66,7 @@ The companion [symfony-template integration plan](docs/superpowers/plans/2026-08
 
 ## Development
 
-Tests never download Tailwind. Provision the pinned Tailwind CSS 4.3.3 binary and pass its absolute path:
+The repository's maintainer test and smoke gates never download Tailwind. Provision the pinned Tailwind CSS 4.3.3 binary and pass its absolute path:
 
 ```console
 export TE4G_TAILWIND_BINARY=/absolute/path/to/tailwindcss
