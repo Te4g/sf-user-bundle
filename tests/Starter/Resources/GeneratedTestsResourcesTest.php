@@ -64,6 +64,9 @@ final class GeneratedTestsResourcesTest extends TestCase
         self::assertStringContainsString('CacheItemPoolInterface::class', $helper);
         self::assertStringContainsString("get('cache.account_test_rate_limiter')", $helper);
         self::assertStringContainsString('->clear()', $helper);
+        self::assertStringContainsString('$this->client->getSession()', $helper);
+        self::assertStringContainsString('$request->setSession($session)', $helper);
+        self::assertStringNotContainsString('getRequest()->getSession()->save()', $helper);
     }
 
     public function testRenderedTemplatedEmailClearsContextAndTheExtractorReadsADecodedAbsoluteHref(): void
@@ -113,6 +116,7 @@ final class GeneratedTestsResourcesTest extends TestCase
     public function testGeneratedTestInfrastructureUsesAnObservableLoggerAndEphemeralLimiterStorage(): void
     {
         $configuration = Yaml::parseFile($this->applicationResources().'/config/packages/test/account_tests.yaml');
+        self::assertFalse($configuration['framework']['mailer']['message_bus'] ?? null);
         self::assertSame(
             'cache.adapter.filesystem',
             $configuration['framework']['cache']['pools']['cache.account_test_rate_limiter']['adapter'] ?? null,
@@ -167,6 +171,16 @@ final class GeneratedTestsResourcesTest extends TestCase
         self::assertStringContainsString('application security probe', $contents);
         self::assertStringContainsString('app_login', $contents);
         self::assertStringContainsString('submitted-secret', $contents);
+
+        (new \ReflectionMethod($loggerClass, 'info'))->invoke(
+            $logger,
+            'object graph probe',
+            ['event' => (object) ['payload' => str_repeat('x', 8192)]],
+        );
+        $contents = (new \ReflectionMethod($loggerClass, 'contents'))->invoke(null);
+        self::assertIsString($contents);
+        self::assertLessThan(4096, strlen($contents));
+        self::assertStringContainsString('[object stdClass]', $contents);
     }
 
     public function testGeneratedSuitesSubstantivelyCoverTheApprovedAccountLifecycle(): void
@@ -350,6 +364,13 @@ final class GeneratedTestsResourcesTest extends TestCase
             self::assertStringContainsString($required, $endpointLimiter, $required);
         }
         self::assertStringNotContainsString('disableReboot()', $endpointLimiter);
+
+        $neutralEndpoints = $this->methodSource(
+            $this->resource('tests/Functional/SecurityBoundaryTest.php'),
+            'submitEmailForm',
+        );
+        self::assertStringContainsString('form:not([action])', $neutralEndpoints);
+        self::assertStringContainsString('assertCount(1, $formNodes)', $neutralEndpoints);
     }
 
     /** @return list<string> */

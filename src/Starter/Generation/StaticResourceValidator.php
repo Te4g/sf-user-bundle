@@ -9,9 +9,35 @@ use Symfony\Component\Yaml\Yaml;
 use Te4g\Starter\Exception\GenerationFailed;
 use Twig\Environment;
 use Twig\Loader\ArrayLoader;
+use Twig\Source;
+use Twig\TwigFilter;
+use Twig\TwigFunction;
 
 final readonly class StaticResourceValidator
 {
+    /** @var list<string> */
+    private const array APPLICATION_TWIG_FUNCTIONS = [
+        'asset',
+        'csrf_token',
+        'form_end',
+        'form_errors',
+        'form_rest',
+        'form_start',
+        'form_widget',
+        'html_cva',
+        'importmap',
+        'inject',
+        'path',
+        'provide',
+    ];
+
+    /** @var list<string> */
+    private const array APPLICATION_TWIG_FILTERS = [
+        'html_attr_type',
+        'tailwind_merge',
+        'trans',
+    ];
+
     public function validate(string $path): void
     {
         try {
@@ -54,7 +80,27 @@ final readonly class StaticResourceValidator
             throw new \RuntimeException('Unable to read Twig resource.');
         }
 
-        (new Environment(new ArrayLoader()))->createTemplate($contents);
+        $environment = new Environment(new ArrayLoader([
+            'form_div_layout.html.twig' => '',
+        ]));
+        $environment->addTokenParser(new SyntaxOnlyPropsTokenParser());
+
+        foreach (self::APPLICATION_TWIG_FUNCTIONS as $function) {
+            $environment->addFunction(new TwigFunction(
+                $function,
+                static fn (array $arguments = []): null => null,
+                ['is_variadic' => true],
+            ));
+        }
+        foreach (self::APPLICATION_TWIG_FILTERS as $filter) {
+            $environment->addFilter(new TwigFilter(
+                $filter,
+                static fn (mixed $value = null, array $arguments = []): null => null,
+                ['is_variadic' => true],
+            ));
+        }
+
+        $environment->parse($environment->tokenize(new Source($contents, $path)));
     }
 
     private function validateSvg(string $path): void

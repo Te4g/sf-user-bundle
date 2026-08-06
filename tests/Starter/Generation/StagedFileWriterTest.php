@@ -10,6 +10,7 @@ use Te4g\Starter\Exception\GenerationFailed;
 use Te4g\Starter\Generation\GenerationPlan;
 use Te4g\Starter\Generation\PlannedResource;
 use Te4g\Starter\Generation\StagedFileWriter;
+use Te4g\Starter\Generation\StaticResourceValidator;
 use Te4g\Starter\Project\ProjectLayout;
 
 final class StagedFileWriterTest extends TestCase
@@ -50,6 +51,25 @@ final class StagedFileWriterTest extends TestCase
         } catch (GenerationFailed) {
             self::assertFileDoesNotExist($this->layout()->path($path));
         }
+    }
+
+    public function testBundledApplicationTemplatesPassStaticValidation(): void
+    {
+        $directory = new \RecursiveDirectoryIterator(__DIR__.'/../../../resources/application/templates');
+        $templates = new \RegexIterator(
+            new \RecursiveIteratorIterator($directory),
+            '/\.twig$/',
+        );
+
+        $validator = new StaticResourceValidator();
+        $validated = 0;
+        foreach ($templates as $template) {
+            self::assertInstanceOf(\SplFileInfo::class, $template);
+            $validator->validate($template->getPathname());
+            ++$validated;
+        }
+
+        self::assertGreaterThan(0, $validated);
     }
 
     public function testCopiedFilesRemainWhenPostCopyWorkFailsElsewhere(): void

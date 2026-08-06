@@ -30,7 +30,8 @@ final class PublicAccountResourcesTest extends TestCase
 
         self::assertStringContainsString('VerifyEmailHelperInterface', $service);
         self::assertStringContainsString("generateSignature(\n            'app_verify_email'", $service);
-        self::assertStringContainsString('validateEmailConfirmation($signedUri', $service);
+        self::assertStringContainsString('validateEmailConfirmationFromRequest($request', $service);
+        self::assertStringContainsString('$this->verification->verify($request,', $controller);
         self::assertStringContainsString("name: 'app_check_email'", $controller);
         self::assertStringContainsString("name: 'app_verify_email'", $controller);
         self::assertStringContainsString("name: 'app_verify_resend'", $controller);

@@ -16,7 +16,10 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Event\ExceptionEvent;
+use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Symfony\Component\HttpKernel\Kernel;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 
@@ -49,7 +52,7 @@ final class GeneratedTestInfrastructureRuntimeTest extends TestCase
                     [
                         'route' => 'app_login',
                         'password' => 'submitted-secret',
-                        'exception' => new \RuntimeException('context-boom'),
+                        'exception' => new \RuntimeException('context-boom', 0, new \LogicException('previous-boom')),
                         'stringable' => new class () implements \Stringable {
                             public function __toString(): string
                             {
@@ -74,6 +77,7 @@ final class GeneratedTestInfrastructureRuntimeTest extends TestCase
                 'application security runtime probe for app_login stringable-value',
                 'submitted-secret',
                 'context-boom',
+                'previous-boom',
                 'stringable-value',
                 'stdClass',
                 'stream',
@@ -85,6 +89,23 @@ final class GeneratedTestInfrastructureRuntimeTest extends TestCase
             ] as $expected) {
                 self::assertStringContainsString($expected, $contents, $expected);
             }
+
+            (new \ReflectionMethod($loggerClass, 'info'))->invoke(
+                $logger,
+                'large Symfony exception event',
+                [
+                    'event' => new ExceptionEvent(
+                        $kernel,
+                        Request::create('/account'),
+                        HttpKernelInterface::MAIN_REQUEST,
+                        new \RuntimeException('event-boom'),
+                    ),
+                ],
+            );
+            $contents = (new \ReflectionMethod($loggerClass, 'contents'))->invoke(null);
+            self::assertIsString($contents);
+            self::assertStringContainsString('[object Symfony\\\\Component\\\\HttpKernel\\\\Event\\\\ExceptionEvent]', $contents);
+            self::assertLessThan(16384, strlen($contents));
 
             self::assertSame($loggerClass, $kernel->getContainer()->get('test.request_logger')::class);
             self::assertSame($loggerClass, $kernel->getContainer()->get('test.security_logger')::class);

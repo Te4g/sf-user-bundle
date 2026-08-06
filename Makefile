@@ -28,8 +28,9 @@ yaml-check: ## Verify the generated Symfony configuration
 assets-check: ## Build generated assets and verify locked icons
 	@php vendor/bin/phpunit tests/Integration/GeneratedShadcnApplicationTest.php --filter testGeneratedApplicationBuildsOfflineAndRendersAccessibleAssetBackedForms
 
-smoke: ## Install into a clean Symfony 8.1 application
-	@./scripts/smoke-test.sh
+smoke: ## Install into fresh skeleton and webapp projects
+	@./scripts/smoke-test.sh skeleton
+	@./scripts/smoke-test.sh webapp
 
 audit: ## Audit locked Composer dependencies
 	@composer audit --locked

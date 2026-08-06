@@ -4,7 +4,8 @@ security:
             memory: null
     firewalls:
         dev:
-            pattern: ^/(_(profiler|wdt)|css|images|js)/
+            pattern: ^/(_profiler|_wdt|assets|build)/
             security: false
         main:
             lazy: true
+            provider: users_in_memory

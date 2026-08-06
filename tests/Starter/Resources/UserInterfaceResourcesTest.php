@@ -122,6 +122,16 @@ final class UserInterfaceResourcesTest extends TestCase
         $twig = Yaml::parseFile($this->applicationResources().'/config/packages/account_twig.yaml');
         self::assertSame(['form/account_theme.html.twig'], $twig['twig']['form_themes']);
 
+        $tailwindMerge = Yaml::parseFile($this->applicationResources().'/config/packages/account_tailwind_merge.yaml');
+        self::assertSame(
+            ['twig.extension'],
+            $tailwindMerge['services']['TalesFromADev\\Twig\\Extra\\Tailwind\\TailwindExtension']['tags'],
+        );
+        self::assertSame(
+            ['twig.runtime'],
+            $tailwindMerge['services']['TalesFromADev\\Twig\\Extra\\Tailwind\\TailwindRuntime']['tags'],
+        );
+
         $notices = $this->contents(dirname(__DIR__, 3).'/THIRD_PARTY_NOTICES.md');
         self::assertStringContainsString('resources/application/templates/components/', $notices);
         self::assertStringContainsString('resources/application/assets/icons/lucide/', $notices);

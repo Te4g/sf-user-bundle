@@ -10,6 +10,7 @@ use App\Repository\ResetPasswordRequestRepository;
 use App\Repository\UserRepository;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\HttpFoundation\Request;
 use SymfonyCasts\Bundle\VerifyEmail\Exception\VerifyEmailExceptionInterface;
 use SymfonyCasts\Bundle\VerifyEmail\VerifyEmailHelperInterface;
 
@@ -62,7 +63,7 @@ final readonly class ProfileService
     }
 
     public function confirmEmailChange(
-        #[\SensitiveParameter] string $signedUri,
+        Request $request,
         int $userId,
     ): User {
         $user = $this->users->find($userId);
@@ -72,7 +73,7 @@ final readonly class ProfileService
         }
 
         try {
-            $this->verifyEmailHelper->validateEmailConfirmation($signedUri, (string) $userId, $pendingEmail);
+            $this->verifyEmailHelper->validateEmailConfirmationFromRequest($request, (string) $userId, $pendingEmail);
         } catch (VerifyEmailExceptionInterface) {
             throw new \RuntimeException('Account update failed.');
         }

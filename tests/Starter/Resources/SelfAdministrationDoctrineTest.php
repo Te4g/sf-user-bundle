@@ -11,6 +11,7 @@ use Doctrine\ORM\ORMSetup;
 use Doctrine\ORM\Tools\SchemaTool;
 use Doctrine\Persistence\ManagerRegistry;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
@@ -63,7 +64,7 @@ final class SelfAdministrationDoctrineTest extends TestCase
         $service = $this->profileService($helper);
         try {
             (new \ReflectionMethod($service, 'confirmEmailChange'))
-                ->invoke($service, 'https://example.test/confirm-a', $userId);
+                ->invoke($service, Request::create('https://example.test/confirm-a'), $userId);
         } catch (\RuntimeException $exception) {
             $failure = $exception;
         }
@@ -105,7 +106,7 @@ final class SelfAdministrationDoctrineTest extends TestCase
         $failure = null;
         try {
             (new \ReflectionMethod($service, 'confirmEmailChange'))
-                ->invoke($service, 'https://example.test/confirm-new', $userId);
+                ->invoke($service, Request::create('https://example.test/confirm-new'), $userId);
         } catch (\Throwable $exception) {
             $failure = $exception;
         }
@@ -279,6 +280,10 @@ final class TransitionVerifyEmailHelper implements VerifyEmailHelperInterface
     }
 
     public function validateEmailConfirmation(string $signedUrl, string $userId, string $userEmail): void
+    {
+    }
+
+    public function validateEmailConfirmationFromRequest(Request $request, string $userId, string $userEmail): void
     {
         ($this->duringValidation ?? static function (): void {
         })();
