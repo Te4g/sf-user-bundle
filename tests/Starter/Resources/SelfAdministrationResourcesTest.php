@@ -19,11 +19,8 @@ final class SelfAdministrationResourcesTest extends TestCase
         self::assertStringContainsString("generateSignature(\n            'app_account_email_verify'", $source);
         self::assertStringContainsString('function confirmEmailChange(', $source);
         self::assertStringContainsString('findOneByNormalizedEmail($pendingEmail)', $source);
-        self::assertStringContainsString('setEmail($pendingEmail)', $source);
-        self::assertStringContainsString('setPendingEmail(null)', $source);
+        self::assertStringContainsString('promotePendingEmail($userId, $pendingEmail)', $source);
         self::assertStringContainsString('catch (UniqueConstraintViolationException)', $source);
-        self::assertStringContainsString('setEmail($activeEmail)', $source);
-        self::assertStringContainsString('setPendingEmail($pendingEmail)', $source);
 
         $request = strstr($source, 'public function requestEmailChange');
         self::assertIsString($request);
@@ -32,7 +29,7 @@ final class SelfAdministrationResourcesTest extends TestCase
         self::assertStringNotContainsString('setEmail(', $request);
 
         self::assertLessThan(
-            strpos($source, 'setEmail($pendingEmail)'),
+            strpos($source, 'promotePendingEmail($userId, $pendingEmail)'),
             strpos($source, 'findOneByNormalizedEmail($pendingEmail)'),
         );
     }
@@ -67,6 +64,8 @@ final class SelfAdministrationResourcesTest extends TestCase
         self::assertSame(2, substr_count($source, '#[\SensitiveParameter] string $'));
         self::assertStringContainsString('isPasswordValid($user, $currentPassword)', $source);
         self::assertStringContainsString('hashPassword($user, $newPassword)', $source);
+        self::assertStringContainsString('wrapInTransaction(', $source);
+        self::assertStringContainsString('save($user, false)', $source);
         self::assertStringContainsString('removeRequests($user)', $source);
     }
 
@@ -82,10 +81,14 @@ final class SelfAdministrationResourcesTest extends TestCase
         self::assertStringContainsString('remove($user, false)', $service);
 
         $deletionCall = strpos($controller, '$this->deletion->delete(');
-        $invalidation = strpos($controller, 'invalidate()');
         self::assertIsInt($deletionCall);
+        $failureCatch = strpos($controller, '} catch (\\RuntimeException) {', $deletionCall);
+        $invalidation = strpos($controller, 'invalidate()');
+        self::assertIsInt($failureCatch);
         self::assertIsInt($invalidation);
+        self::assertLessThan($failureCatch, $deletionCall);
         self::assertLessThan($invalidation, $deletionCall);
+        self::assertLessThan($invalidation, $failureCatch);
         self::assertStringContainsString("redirectToRoute('app_home')", $controller);
     }
 

@@ -51,6 +51,24 @@ final class UserRepository extends ServiceEntityRepository implements PasswordUp
         }
     }
 
+    public function promotePendingEmail(int $userId, string $expectedPendingEmail): bool
+    {
+        $affectedRows = $this->getEntityManager()->createQueryBuilder()
+            ->update(User::class, 'u')
+            ->set('u.email', ':email')
+            ->set('u.pendingEmail', 'NULL')
+            ->where('u.id = :id')
+            ->andWhere('u.pendingEmail = :expectedPendingEmail')
+            ->setParameter('email', $expectedPendingEmail)
+            ->setParameter('id', $userId)
+            ->setParameter('expectedPendingEmail', $expectedPendingEmail)
+            ->getQuery()
+            ->execute()
+        ;
+
+        return 1 === $affectedRows;
+    }
+
     public function upgradePassword(PasswordAuthenticatedUserInterface $user, string $newHashedPassword): void
     {
         if (!$user instanceof User) {

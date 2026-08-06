@@ -10,6 +10,7 @@ use App\Form\DeleteAccountType;
 use App\Form\Model\DeleteAccountInput;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormError;
+use Symfony\Component\Form\FormView;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -35,19 +36,31 @@ final class DeleteAccountController extends AbstractController
         if ($form->isSubmitted() && $form->isValid()) {
             try {
                 $this->deletion->delete($user, $input->currentPassword);
-                $this->tokenStorage->setToken(null);
-                $request->getSession()->invalidate();
-
-                return $this->redirectToRoute('app_home');
             } catch (\RuntimeException) {
                 $form->addError(new FormError('Unable to delete your account.'));
+
+                return $this->renderDeleteForm($user, $form->createView(), Response::HTTP_UNPROCESSABLE_ENTITY);
             }
+
+            $this->tokenStorage->setToken(null);
+            $request->getSession()->invalidate();
+
+            return $this->redirectToRoute('app_home');
         }
 
+        return $this->renderDeleteForm(
+            $user,
+            $form->createView(),
+            $form->isSubmitted() ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK,
+        );
+    }
+
+    private function renderDeleteForm(User $user, FormView $form, int $status): Response
+    {
         return $this->render('account/delete.html.twig', [
             'account' => $user,
-            'form' => $form->createView(),
-        ], $form->isSubmitted() ? new Response(status: Response::HTTP_UNPROCESSABLE_ENTITY) : null);
+            'form' => $form,
+        ], new Response(status: $status));
     }
 
     private function account(): User
