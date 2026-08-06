@@ -234,6 +234,33 @@ final class UserInterfaceResourcesTest extends TestCase
         self::assertTrue($process->isSuccessful(), $process->getErrorOutput().$process->getOutput());
     }
 
+    public function testEveryHeaderRendersTheThemeSelectorBeforeStylesLoad(): void
+    {
+        $base = $this->resource('templates/base.html.twig');
+        $themePosition = strpos($base, "asset('theme.js')");
+        $stylePosition = strpos($base, "asset('styles/app.css')");
+
+        self::assertIsInt($themePosition);
+        self::assertIsInt($stylePosition);
+        self::assertLessThan($stylePosition, $themePosition);
+
+        foreach (['public', 'auth', 'app'] as $layout) {
+            self::assertSame(
+                1,
+                substr_count($this->resource('templates/layout/'.$layout.'.html.twig'), '<twig:ThemeSelector />'),
+                $layout,
+            );
+        }
+
+        $selector = $this->resource('templates/components/ThemeSelector.html.twig');
+        self::assertStringContainsString('<label', $selector);
+        self::assertStringContainsString('>Theme</span>', $selector);
+        self::assertStringContainsString('data-theme-selector', $selector);
+        self::assertSame(1, substr_count($selector, 'value="system"'));
+        self::assertSame(1, substr_count($selector, 'value="light"'));
+        self::assertSame(1, substr_count($selector, 'value="dark"'));
+    }
+
     public function testTwigYamlTranslationSvgAndBrowserOnlyBehaviorPassStaticGates(): void
     {
         $validator = new StaticResourceValidator();
