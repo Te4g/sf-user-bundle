@@ -1,0 +1,16 @@
+{# @prop label string The accessible label announced to assistive technologies. #}
+{# Locally modified to remain fully offline with the bundle's fixed icon allowlist. #}
+{%- props label = 'Loading' -%}
+<svg
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    data-slot="spinner"
+    role="status"
+    aria-label="{{ label }}"
+    class="{{ ('size-4 animate-spin ' ~ attributes.render('class'))|tailwind_merge }}"
+    {{ attributes.without('class') }}
+>
+    <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity="0.25" stroke-width="3" />
+    <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-linecap="round" stroke-width="3" />
+</svg>

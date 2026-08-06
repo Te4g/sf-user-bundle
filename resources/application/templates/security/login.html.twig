@@ -1,0 +1,42 @@
+{% extends 'layout/auth.html.twig' %}
+{% block title %}{{ 'login.title'|trans }}{% endblock %}
+{% block main %}
+<main class="mx-auto flex min-h-[calc(100svh-4rem)] w-full max-w-md items-center px-4 py-10">
+    <twig:Card>
+        <twig:Card:Header><twig:Card:Title><h1 class="text-xl">{{ 'login.title'|trans }}</h1></twig:Card:Title></twig:Card:Header>
+        <twig:Card:Content class="space-y-6">
+            <div aria-live="polite">{% if authentication_failed %}<twig:Alert variant="destructive"><twig:ux:icon name="lucide:triangle-alert" /><twig:Alert:Title>{{ 'login.failed'|trans }}</twig:Alert:Title></twig:Alert>{% endif %}</div>
+            <form method="post" action="{{ path('app_login') }}" class="space-y-5">
+                <twig:Field>
+                    <twig:Field:Label for="login-email" class="required">{{ 'form.email'|trans }}</twig:Field:Label>
+                    <twig:Input id="login-email" name="_username" type="email" autocomplete="email" value="{{ last_username }}" aria-describedby="login-email-help" required />
+                    <twig:Field:Description id="login-email-help">{{ 'login.title'|trans }}</twig:Field:Description>
+                </twig:Field>
+                <twig:Field data-controller="password-visibility" data-password-visibility-show-label-value="{{ 'password.show'|trans }}" data-password-visibility-hide-label-value="{{ 'password.hide'|trans }}">
+                    <twig:Field:Label for="login-password" class="required">{{ 'form.password'|trans }}</twig:Field:Label>
+                    <div class="relative">
+                        <twig:Input id="login-password" name="_password" type="password" autocomplete="current-password" class="pr-28" data-password-visibility-target="input" required />
+                        <twig:Button type="button" variant="ghost" size="sm" class="absolute right-1 top-1" aria-pressed="false" data-password-visibility-target="button" data-action="click->password-visibility#toggle"><twig:ux:icon name="lucide:eye" /><span data-password-visibility-target="label">{{ 'password.show'|trans }}</span></twig:Button>
+                    </div>
+                </twig:Field>
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
+                <twig:Button type="submit" class="w-full" data-turbo-submits-with="{{ 'form.submitting'|trans }}"><twig:Spinner class="hidden" label="{{ 'form.submitting'|trans }}" />{{ 'login.submit'|trans }}</twig:Button>
+            </form>
+
+            <twig:Field:Separator>{{ 'login.magic_link_title'|trans }}</twig:Field:Separator>
+            {{ form_start(magic_link_form, {attr: {class: 'space-y-5'}}) }}
+                {% if magic_link_form.vars.submitted and not magic_link_form.vars.valid %}
+                    <twig:Alert variant="destructive"><twig:Alert:Title>{{ 'form.error_summary'|trans }}</twig:Alert:Title><twig:Alert:Description>{{ form_errors(magic_link_form) }}</twig:Alert:Description></twig:Alert>
+                {% endif %}
+                <twig:Field>
+                    <twig:Field:Label for="{{ magic_link_form.email.vars.id }}" class="{{ magic_link_form.email.vars.required ? 'required' : '' }}">{{ magic_link_form.email.vars.label|trans(magic_link_form.email.vars.label_translation_parameters, magic_link_form.email.vars.translation_domain) }}</twig:Field:Label>
+                    {{ form_widget(magic_link_form.email, {attr: {'aria-describedby': 'email_email_errors'}}) }}
+                    {{ form_errors(magic_link_form.email) }}
+                </twig:Field>
+                {{ form_rest(magic_link_form) }}
+                <twig:Button type="submit" variant="outline" class="w-full" data-turbo-submits-with="{{ 'form.submitting'|trans }}"><twig:ux:icon name="lucide:mail" />{{ 'login.magic_link_submit'|trans }}</twig:Button>
+            {{ form_end(magic_link_form, {render_rest: false}) }}
+        </twig:Card:Content>
+    </twig:Card>
+</main>
+{% endblock %}
