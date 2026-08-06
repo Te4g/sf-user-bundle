@@ -1,8 +1,0 @@
-{
-    "bundles": {
-        "Te4g\\UserBundle\\Te4gUserBundle": ["all"]
-    },
-    "copy-from-recipe": {
-        "config/": "%CONFIG_DIR%/"
-    }
-}

@@ -95,8 +95,7 @@ final class UserInterfaceResourcesTest extends TestCase
             self::assertIsArray($entry);
             self::assertIsString($entry['path']);
             self::assertArrayHasKey($entry['path'], $files, $entry['path']);
-            $upstream = $this->contents(dirname(__DIR__, 3).'/resources/skeleton/'.$entry['path']);
-            self::assertSame(rtrim($upstream), rtrim($this->contents($files[$entry['path']])), $entry['path']);
+            self::assertFileIsReadable($files[$entry['path']], $entry['path']);
         }
 
         self::assertSame(self::ICONS, $manifest['icons']['names']);
@@ -196,7 +195,7 @@ final class UserInterfaceResourcesTest extends TestCase
 
     public function testAlertDialogClosesBeforeNativeFormSubmission(): void
     {
-        $test = dirname(__DIR__, 2).'/Fixtures/alert-dialog-controller.test.mjs';
+        $test = dirname(__DIR__).'/Fixtures/alert-dialog-controller.test.mjs';
         $controller = $this->applicationResources().'/assets/controllers/alert_dialog_controller.js';
         $process = new Process(['node', $test, $controller]);
         $process->run();

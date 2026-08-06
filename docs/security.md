@@ -1,60 +1,46 @@
 # Security operations
 
-## Enumeration resistance
+The generated security code belongs to the application. Treat these defaults as security boundaries when you customize it, and keep Symfony and the generated dependencies current.
 
-Registration, verification resend, magic-link request, and password-reset request use neutral known/unknown-account responses. Preserve that behavior when customizing templates or controllers. Invalid submitted forms return HTTP 422, while successful neutral outcomes do not reveal whether an email exists.
+## Enumeration resistance and throttling
 
-The generated security configuration exposes no detailed authentication errors. Login is limited to five attempts per fifteen minutes. Account request flows use a separate sliding-window limiter with the same limit, keyed by a composite of client IP and a hash of normalized email; the raw email is not used as the limiter key. Reset-password requests also use the upstream one-hour throttle.
+Registration, verification resend, magic-link request, and password-reset request use neutral responses for known and unknown addresses. Invalid submitted forms return HTTP 422 without turning account existence into a response difference.
 
-## Signed-link lifetimes
+Login is limited to five attempts per fifteen minutes. Account request flows use separate sliding-window limiters with the same limit, keyed by client IP plus a hash of the normalized email; raw email is not used as the limiter key. Password-reset requests also retain the upstream one-hour throttle.
+
+## Signed links and sessions
 
 | Link | Lifetime | Additional controls |
 | --- | --- | --- |
-| email verification | 3,600 seconds | signed link |
-| password reset | 3,600 seconds | persisted reset request; one-hour request throttle |
-| magic login | 600 seconds | ID/email/password signature properties, one use, used-link cache, POST-only and CSRF-protected completion |
+| email verification | 3,600 seconds | signed request |
+| password reset | 3,600 seconds | persisted request and one-hour request throttle |
+| magic login | 600 seconds | ID, email, and password signature properties; one use; used-link cache; POST-only CSRF-protected completion |
 | pending email change | signed workflow | current-password confirmation before request |
 
-Magic links make the email inbox an authentication factor. They are a convenience, not a substitute for step-up authentication or MFA in a security-critical application.
+Magic links make the inbox an authentication factor. Add application-level MFA or step-up authentication when inbox control alone is insufficient.
 
-The bundle validates the magic-link confirmation form's `_csrf_token` on the routed POST request before Symfony's native login-link authenticator runs. Missing or invalid tokens receive HTTP 403 and do not consume the signed link. CSRF tokens supplied only in the URL query are ignored; keep the bundle runtime subscriber enabled when customizing the login-link page.
+The generated login-link subscriber validates the routed POST form's `_csrf_token` before Symfony's authenticator consumes the link. Query-string tokens are ignored. Login and logout use CSRF protection, and logout is POST-only.
 
-## Password, email, session, and deletion behavior
+Password changes and resets replace the password hash. The generated `User` stores only a `crc32c` fingerprint of that hash in serialized session state, so an existing session is invalidated after the password changes without storing the raw hash. Email and password transitions clear outstanding reset requests. Email confirmation and password changes use Doctrine transactions so related state changes succeed or roll back together.
 
-- Password change and password reset replace the password hash. The generated `User` serializes only a `crc32c` fingerprint of that hash into the session, so a refreshed session is invalidated after a password change without storing the raw hash in session data.
-- Email changes require the current password and use a pending-email signed-link flow. Password or email changes remove outstanding reset tokens.
-- Account deletion requires the current password, runs every application deletion guard, clears the security token, and invalidates the session after removal.
-- Login and logout use CSRF protection. Logout is POST-only.
+Account deletion verifies the current password, removes the account in a transaction, clears the security token, and invalidates the session. Add application-specific ownership or retention checks directly to `App\Account\AccountDeletionService` before removal. Keep irreversible external side effects outside a transaction unless they are retry-safe.
 
-Application listeners must preserve these boundaries. In particular, do not send irreversible side effects from a pre-deletion listener unless they are designed for transaction failure and retry behavior.
+## Mail and URL generation
+
+Configure a production `MAILER_DSN` and `framework.router.default_uri`. Verification, reset, magic-login, and email-change links may be generated by workers or CLI processes where no incoming request supplies the public origin. Review sender identity, transport authentication, queue retries, bounce handling, and expiration behavior for the deployed environment.
 
 ## Log redaction
 
-Signed URLs contain credentials. Configure application logs, reverse-proxy access logs, CDN/WAF logs, and APM capture so they:
+Signed URLs and reset paths contain credentials. Configure application, reverse-proxy, CDN/WAF, and APM logging to:
 
-- never record query strings for email verification, magic-login, or email-change confirmation URLs;
-- redact the `{token}` path segment on `/reset-password/{token}`;
-- exclude authentication and account form bodies, including passwords, reset tokens, and CSRF tokens;
-- avoid logging complete lifecycle event objects or user objects.
+- omit query strings for verification, magic-login, and email-change confirmation links;
+- redact the token segment in `/reset-password/{token}`;
+- exclude authentication and account form bodies, including passwords, tokens, and CSRF values;
+- avoid serializing complete request, exception-event, user, or mail objects;
+- treat email addresses as personal data with explicit retention and access policy.
 
-Prefer generic message types, exception class names, and stable account IDs. Treat email addresses as personal data and log them only under an explicit retention/access policy.
+The generated functional tests install observable request and security loggers to catch leaks in exercised workflows. They supplement rather than replace production log-pipeline configuration.
 
-## Generated UI provenance
+## Vendored UI and offline assets
 
-The application UI snapshot is intentionally vendored and hash-checked. Its provenance is recorded in `resources/shadcn/manifest.json`:
-
-- Symfony UX Toolkit 3.3.0, reference `f01228fe7d0e3bd26b1c27eb34b0cc1012a9b208`;
-- Lucide icon package `@iconify-json/lucide` 1.2.121, exactly seven regular SVG files;
-- license/notices and a SHA-256 for every synchronized snapshot file.
-
-Tailwind CSS builds are pinned to standalone version 4.3.3 and platform checksums in `tests/Fixtures/App/PinnedTailwindBinary.php`. Tests never download a binary; `TE4G_TAILWIND_BINARY` must name a pre-provisioned, validated executable.
-
-To update the snapshot, use a disposable development application and run the required recipes sequentially, for example:
-
-```bash
-php bin/console ux:install alert --kit shadcn --no-interaction
-php bin/console ux:install alert-dialog --kit shadcn --no-interaction
-# Continue with each recipe recorded in resources/shadcn/manifest.json.
-```
-
-Then run the repository's `tools/ShadcnSnapshotSynchronizer.php` workflow, review every copied file, manifest hash, package reference, icon, and notice, and run `make test` with the pinned Tailwind binary. Never regenerate the production snapshot implicitly during install or test.
+The generated application receives a reviewed Twig component snapshot and seven local Lucide icons. Provenance is recorded in `resources/shadcn/manifest.json` and `THIRD_PARTY_NOTICES.md`. Installation and tests use a caller-provisioned Tailwind CSS 4.3.3 executable whose platform checksum is pinned in the starter test support; they never download a binary implicitly.

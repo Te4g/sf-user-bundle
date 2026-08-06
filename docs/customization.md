@@ -1,178 +1,46 @@
 # Customization
 
-Installed templates, components, assets, icons, translations, entity, repositories, and migration belong to the application. The examples below use bundle contracts so application policy stays outside vendor code.
+The starter copies final application code rather than installing extension points in a vendor bundle. Customize the generated `App\` classes, Symfony configuration, Twig templates, assets, translations, and tests directly, and keep the tests that enforce the security behavior you still require.
 
-## Extend registration
+## Account data and workflows
 
-Add application-only fields with a Symfony form type extension. An unmapped terms checkbox does not require changing the bundle input DTO:
+- Add application fields to `src/Entity/User.php`, update the corresponding form and service, then generate a normal Doctrine migration.
+- Keep email normalization centralized in `src/Account/EmailNormalizer.php` and use `src/Repository/UserRepository.php` for normalized lookups.
+- Adapt registration, verification, password recovery, profile changes, and deletion in the matching classes under `src/Account/` and `src/Controller/`.
+- Add product-specific account deletion checks in `src/Account/AccountDeletionService.php` before the transactional removal step.
+- Customize message subjects, templates, sender policy, or queueing in `src/Mailer/AccountMailer.php` and the templates under `templates/email/`.
 
-```php
-<?php
+When adding side effects, decide explicitly whether they belong inside the Doctrine transition or after commit. External calls inside a transaction can succeed even if the database later rolls back; post-commit work needs retry and deduplication behavior.
 
-namespace App\Form\Extension;
+## Routes and navigation
 
-use Symfony\Component\Form\AbstractTypeExtension;
-use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
-use Symfony\Component\Form\FormBuilderInterface;
-use Symfony\Component\OptionsResolver\OptionsResolver;
-use Symfony\Component\Validator\Constraints\IsTrue;
-use Te4g\UserBundle\Form\RegistrationType;
+Generated routes use application names such as `app_register`, `app_login`, `app_dashboard`, and `app_account`. Change route attributes and every matching Twig link together. Preserve POST-only logout, login-link confirmation, and account deletion unless you replace them with an equivalent CSRF-protected design.
 
-final class RegistrationTypeExtension extends AbstractTypeExtension
-{
-    public function buildForm(FormBuilderInterface $builder, array $options): void
-    {
-        $builder->add('agreeTerms', CheckboxType::class, [
-            'mapped' => false,
-            'constraints' => [new IsTrue(message: 'You must accept the terms.')],
-        ]);
-    }
+The public, authentication, and authenticated shells live in:
 
-    public static function getExtendedTypes(): iterable
-    {
-        return [RegistrationType::class];
-    }
-}
-```
+- `templates/layout/public.html.twig`
+- `templates/layout/auth.html.twig`
+- `templates/layout/app.html.twig`
 
-With the default Symfony service autoconfiguration, no manual tag is needed.
+Edit these as normal Twig templates. Turbo Drive provides navigation by default; no vendor runtime is involved.
 
-## Replace a template
+## UI components and styles
 
-The installer already writes application-owned overrides below `templates/bundles/Te4gUserBundle/`; edit those files directly. Alternatively, point one configuration key at a new application template:
+Reusable Twig components are under `templates/components/`. The generated stylesheet is `assets/styles/app.css`, built by SymfonyCasts TailwindBundle, and includes the local Shadcn/Tailwind animation imports installed into the application's import map.
 
-```yaml
-te4g_user:
-    templates:
-        login: account/login.html.twig
-```
+The starter deliberately generates only two custom Stimulus controllers:
 
-```twig
-{# templates/account/login.html.twig #}
-{% extends 'bundles/Te4gUserBundle/security/login.html.twig' %}
+- `assets/controllers/password_visibility_controller.js`
+- `assets/controllers/alert_dialog_controller.js`
 
-{% block title %}Sign in to Example{% endblock %}
-{% block body %}
-    <p class="mx-auto max-w-md pt-8">Use your Example account.</p>
-    {{ parent() }}
-{% endblock %}
-```
+Keep their label, focus, native validation, and dialog semantics when changing markup. Add new Stimulus controllers only for browser-local behavior; use ordinary Symfony requests and Turbo for server work.
 
-If you copy a generated template, keep its CSRF fields, neutral response copy, and POST-only security actions intact.
+Offline icons live in `assets/icons/lucide/`. If you add or replace icons, keep them local, review their license, and update application tests and accessibility labels. The starter's maintainer snapshot tool and manifest describe the original vendored UI provenance; they are not copied into the generated application.
 
-## Supply a repository adapter
+## Forms, translations, and tests
 
-Configure any service implementing `AccountRepositoryInterface`:
+Form types and input objects live under `src/Form/`; the application form theme is `templates/form/account_theme.html.twig`. Preserve explicit labels, associated error IDs, CSRF token IDs, neutral account-request responses, and HTTP 422 for invalid submissions.
 
-```php
-<?php
+English strings are in `translations/messages.en.xlf`. Add normal Symfony translation catalogues for other locales.
 
-namespace App\Security;
-
-use App\Entity\User;
-use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Component\Security\Core\Exception\UnsupportedUserException;
-use Te4g\UserBundle\Contract\AccountRepositoryInterface;
-use Te4g\UserBundle\Contract\AccountUserInterface;
-
-final readonly class DoctrineAccountRepository implements AccountRepositoryInterface
-{
-    public function __construct(private EntityManagerInterface $entityManager) {}
-
-    public function findOneByEmail(string $email): ?AccountUserInterface
-    {
-        return $this->entityManager->getRepository(User::class)->findOneBy(['email' => $email]);
-    }
-
-    public function findById(int|string $id): ?AccountUserInterface
-    {
-        return $this->entityManager->find(User::class, $id);
-    }
-
-    public function save(AccountUserInterface $user): void
-    {
-        $this->assertSupported($user);
-        $this->entityManager->persist($user);
-        $this->entityManager->flush();
-    }
-
-    public function remove(AccountUserInterface $user): void
-    {
-        $this->assertSupported($user);
-        $this->entityManager->remove($user);
-        $this->entityManager->flush();
-    }
-
-    private function assertSupported(AccountUserInterface $user): void
-    {
-        if (!$user instanceof User) {
-            throw new UnsupportedUserException(sprintf('Expected %s.', User::class));
-        }
-    }
-}
-```
-
-```yaml
-te4g_user:
-    user_class: App\Entity\User
-    account_repository: App\Security\DoctrineAccountRepository
-```
-
-## React to lifecycle events
-
-Available events include `AccountRegisteredEvent`, `AccountVerifiedEvent`, `EmailChangeRequestedEvent`, `EmailChangedEvent`, `PasswordChangedEvent`, `BeforeAccountDeletedEvent`, and `AfterAccountDeletedEvent`.
-
-```php
-<?php
-
-namespace App\EventSubscriber;
-
-use Psr\Log\LoggerInterface;
-use Symfony\Component\EventDispatcher\EventSubscriberInterface;
-use Te4g\UserBundle\Event\AccountRegisteredEvent;
-
-final readonly class AccountRegisteredSubscriber implements EventSubscriberInterface
-{
-    public function __construct(private LoggerInterface $logger) {}
-
-    public static function getSubscribedEvents(): array
-    {
-        return [AccountRegisteredEvent::class => 'onRegistered'];
-    }
-
-    public function onRegistered(AccountRegisteredEvent $event): void
-    {
-        $this->logger->info('account_registered', [
-            'account_id' => (string) $event->getUser()->getId(),
-        ]);
-    }
-}
-```
-
-Event objects may expose email addresses. Do not serialize or indiscriminately log whole event/user objects.
-
-## Guard account deletion
-
-Deletion guards are autoconfigured and evaluated before removal:
-
-```php
-<?php
-
-namespace App\Security;
-
-use Te4g\UserBundle\Contract\AccountDeletionGuardInterface;
-use Te4g\UserBundle\Contract\AccountUserInterface;
-use Te4g\UserBundle\Exception\AccountDeletionRejected;
-
-final class OwnerDeletionGuard implements AccountDeletionGuardInterface
-{
-    public function assertDeletionAllowed(AccountUserInterface $user): void
-    {
-        if (in_array('ROLE_OWNER', $user->getRoles(), true)) {
-            throw new AccountDeletionRejected('owner_account_requires_transfer');
-        }
-    }
-}
-```
-
-Keep account deletion enabled for the guard to run. Set `features.account_deletion: false` only when the application intentionally removes self-service deletion entirely.
+The generated `tests/Functional/` suite is application-owned. Extend it alongside each workflow change, especially for unknown-account neutrality, expired or reused signed links, invalid CSRF tokens, password/session invalidation, concurrent email changes, transactional rollback, and sensitive log content.

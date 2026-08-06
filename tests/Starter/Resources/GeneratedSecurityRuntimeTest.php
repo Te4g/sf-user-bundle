@@ -58,7 +58,7 @@ final class GeneratedSecurityRuntimeTest extends TestCase
 
             $repository = $container->get($repositoryClass);
             self::assertSame($repositoryClass, $repository::class);
-            $user = (new \ReflectionClass($userClass))->newInstance();
+            $user = $metadata->newInstance();
             (new \ReflectionMethod($user, 'setName'))->invoke($user, 'Owner');
             (new \ReflectionMethod($user, 'setEmail'))->invoke($user, 'owner@example.com');
             (new \ReflectionMethod($user, 'setPassword'))->invoke($user, 'hash');

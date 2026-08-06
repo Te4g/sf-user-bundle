@@ -50,7 +50,7 @@ readonly APP_DIR="${smoke_root}/app"
 printf 'Verifying the pinned Tailwind CSS executable...\n'
 validated_tailwind="$(php -r '
 require $argv[1]."/vendor/autoload.php";
-echo Te4g\UserBundle\Tests\Fixtures\App\PinnedTailwindBinary::tailwind433()->validate($argv[2]);
+echo Te4g\Starter\Tests\Fixtures\PinnedTailwindBinary::tailwind433()->validate($argv[2]);
 ' "$PROJECT_DIR" "$TAILWIND_BINARY")"
 [ "$validated_tailwind" = "$TAILWIND_BINARY" ] || fail 'Tailwind validation returned an unexpected path.'
 export TE4G_TAILWIND_BINARY="$validated_tailwind"
