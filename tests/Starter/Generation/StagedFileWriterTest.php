@@ -124,6 +124,25 @@ final class StagedFileWriterTest extends TestCase
         }
     }
 
+    public function testReplacementPreservesExistingReadableFilePermissions(): void
+    {
+        $layout = $this->layout();
+        $target = $layout->path('config/packages/security.yaml');
+        self::assertTrue(mkdir(dirname($target), 0700, true));
+        self::assertNotFalse(file_put_contents($target, 'fresh baseline'));
+        self::assertTrue(chmod($target, 0644));
+        $source = $this->temporaryDirectory.'/replacement';
+        self::assertNotFalse(file_put_contents($source, 'generated security'));
+        $plan = new GenerationPlan([
+            PlannedResource::replace('config/packages/security.yaml', $source, 'fresh baseline'),
+        ], []);
+
+        $this->writer()->write($layout, $plan);
+
+        clearstatcache(true, $target);
+        self::assertSame(0644, fileperms($target) & 0777);
+    }
+
     public function testCleanupUnlinksASwappedStagingRootWithoutTraversingOutsideDirectory(): void
     {
         $staging = $this->temporaryDirectory.'/staging';
