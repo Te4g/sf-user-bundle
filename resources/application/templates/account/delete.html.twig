@@ -22,13 +22,13 @@
                     <twig:Field data-controller="password-visibility" data-password-visibility-show-label-value="{{ 'password.show'|trans }}" data-password-visibility-hide-label-value="{{ 'password.hide'|trans }}">
                         <twig:Field:Label for="{{ form.currentPassword.vars.id }}" class="{{ form.currentPassword.vars.required ? 'required' : '' }}">{{ form.currentPassword.vars.label|trans(form.currentPassword.vars.label_translation_parameters, form.currentPassword.vars.translation_domain) }}</twig:Field:Label>
                         <div class="relative">
-                            {{ form_widget(form.currentPassword, {attr: {'aria-describedby': 'delete_account_currentPassword_errors', 'data-password-visibility-target': 'input', class: 'pr-28'}}) }}
+                            {{ form_widget(form.currentPassword, {attr: {'aria-describedby': form.currentPassword.vars.id ~ '_errors', 'data-password-visibility-target': 'input', class: 'pr-28'}}) }}
                             <twig:Button type="button" variant="ghost" size="sm" class="absolute right-1 top-1" aria-pressed="false" data-password-visibility-target="button" data-action="click->password-visibility#toggle"><twig:ux:icon name="lucide:eye" /><span data-password-visibility-target="label">{{ 'password.show'|trans }}</span></twig:Button>
                         </div>
                         {{ form_errors(form.currentPassword) }}
                     </twig:Field>
                     <twig:Field orientation="horizontal">
-                        <div>{{ form_widget(form.confirm, {attr: {'aria-describedby': 'delete_account_confirm_errors'}}) }}</div>
+                        <div>{{ form_widget(form.confirm, {attr: {'aria-describedby': form.confirm.vars.id ~ '_errors'}}) }}</div>
                         <twig:Field:Content>
                             <twig:Field:Label for="{{ form.confirm.vars.id }}" class="{{ form.confirm.vars.required ? 'required' : '' }}">{{ form.confirm.vars.label|trans(form.confirm.vars.label_translation_parameters, form.confirm.vars.translation_domain) }}</twig:Field:Label>
                             {{ form_errors(form.confirm) }}

@@ -19,12 +19,12 @@
                 {% endif %}
                 <twig:Field>
                     <twig:Field:Label for="{{ form.name.vars.id }}" class="{{ form.name.vars.required ? 'required' : '' }}">{{ form.name.vars.label|trans(form.name.vars.label_translation_parameters, form.name.vars.translation_domain) }}</twig:Field:Label>
-                    {{ form_widget(form.name, {attr: {'aria-describedby': 'profile_name_errors'}}) }}
+                    {{ form_widget(form.name, {attr: {'aria-describedby': form.name.vars.id ~ '_errors'}}) }}
                     {{ form_errors(form.name) }}
                 </twig:Field>
                 <twig:Field>
                     <twig:Field:Label for="{{ form.email.vars.id }}" class="{{ form.email.vars.required ? 'required' : '' }}">{{ form.email.vars.label|trans(form.email.vars.label_translation_parameters, form.email.vars.translation_domain) }}</twig:Field:Label>
-                    {{ form_widget(form.email, {attr: {'aria-describedby': 'profile-email-help profile_email_errors'}}) }}
+                    {{ form_widget(form.email, {attr: {'aria-describedby': 'profile-email-help ' ~ form.email.vars.id ~ '_errors'}}) }}
                     <twig:Field:Description id="profile-email-help">A confirmation link is sent before your email address changes.</twig:Field:Description>
                     {{ form_errors(form.email) }}
                 </twig:Field>

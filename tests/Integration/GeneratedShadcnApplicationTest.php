@@ -10,11 +10,14 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Form\Extension\Core\Type\EmailType as SymfonyEmailType;
+use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormFactoryInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Session\Session;
 use Symfony\Component\HttpFoundation\Session\Storage\MockArraySessionStorage;
+use Symfony\Component\Validator\Constraints as Assert;
 use Te4g\UserBundle\Form\DeleteAccountType;
 use Te4g\UserBundle\Form\EmailType;
 use Te4g\UserBundle\Form\Model\DeleteAccountInput;
@@ -190,6 +193,75 @@ final class GeneratedShadcnApplicationTest extends TestCase
                     self::assertSame(1, $this->query($xpath, '//*[@id='.$this->xpathLiteral($id).']')->length, $name.' globally unique id '.$id);
                 }
             }
+        } finally {
+            $kernel->shutdown();
+            restore_exception_handler();
+        }
+    }
+
+    #[PreserveGlobalState(false)]
+    #[RunInSeparateProcess]
+    public function testExplicitApplicationLabelsAndDynamicErrorIdsRenderAccessibly(): void
+    {
+        $this->installGeneratedApplication();
+        $kernel = new GeneratedShadcnKernel($this->projectDirectory, $this->tailwindBinary());
+        $kernel->boot();
+
+        try {
+            $container = $kernel->getContainer();
+            $forms = $container->get('test.form_factory');
+            $requestStack = $container->get('test.request_stack');
+            $twig = $container->get('test.twig');
+            self::assertInstanceOf(FormFactoryInterface::class, $forms);
+            self::assertInstanceOf(RequestStack::class, $requestStack);
+            self::assertInstanceOf(Environment::class, $twig);
+
+            $request = Request::create('/');
+            $request->setSession(new Session(new MockArraySessionStorage()));
+            $requestStack->push($request);
+
+            $labels = $forms->createBuilder();
+            foreach (['name', 'email', 'password', 'password_confirmation', 'current_password', 'new_password', 'delete_confirmation'] as $name) {
+                $labels->add($name, TextType::class, ['label' => 'form.'.$name]);
+            }
+            $fields = array_filter(
+                $labels->getForm()->createView()->children,
+                static fn ($field): bool => 'hidden' !== ($field->vars['block_prefixes'][1] ?? null),
+            );
+            foreach ($fields as $field) {
+                self::assertIsString($field->vars['label'], $field->vars['full_name']);
+                self::assertNotSame('', trim($field->vars['label']), $field->vars['full_name']);
+            }
+
+            $html = $twig->createTemplate('{% for field in fields %}{{ form_label(field) }}{% endfor %}')->render(['fields' => $fields]);
+            $document = new \DOMDocument();
+            self::assertTrue(@$document->loadHTML($html, LIBXML_NOERROR | LIBXML_NOWARNING));
+            $labels = $document->getElementsByTagName('label');
+            self::assertCount(count($fields), $labels);
+            foreach ($labels as $label) {
+                self::assertNotSame('', trim($label->textContent));
+            }
+
+            $email = $forms->createBuilder(data: ['email' => ''])
+                ->add('email', SymfonyEmailType::class, [
+                    'label' => 'form.email',
+                    'constraints' => [new Assert\NotBlank(), new Assert\Email()],
+                ])
+                ->getForm();
+            $email->submit(['email' => 'invalid']);
+            $emailHtml = $twig->createTemplate(<<<'TWIG'
+                {{ form_label(form.email) }}
+                {{ form_widget(form.email, {attr: {'aria-describedby': form.email.vars.id ~ '_errors'}}) }}
+                {{ form_errors(form.email) }}
+                TWIG)->render(['form' => $email->createView()]);
+            $emailDocument = new \DOMDocument();
+            self::assertTrue(@$emailDocument->loadHTML($emailHtml, LIBXML_NOERROR | LIBXML_NOWARNING));
+            $emailXpath = new \DOMXPath($emailDocument);
+            self::assertSame(1, $this->query($emailXpath, '//input[@id="form_email" and @aria-describedby="form_email_errors"]')->length);
+            self::assertSame(1, $this->query($emailXpath, '//*[@id="form_email_errors"]')->length);
+            $emailLabel = $this->query($emailXpath, '//label[@for="form_email"]')->item(0);
+            self::assertInstanceOf(\DOMElement::class, $emailLabel);
+            self::assertNotSame('', trim($emailLabel->textContent));
         } finally {
             $kernel->shutdown();
             restore_exception_handler();

@@ -35,6 +35,7 @@ export default class extends Controller {
     }
 
     submit() {
+        this.close();
         this.formTarget.requestSubmit();
     }
 }

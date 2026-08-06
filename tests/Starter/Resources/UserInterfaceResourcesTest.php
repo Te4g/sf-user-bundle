@@ -137,6 +137,63 @@ final class UserInterfaceResourcesTest extends TestCase
         self::assertStringNotContainsString('password_change_failed', $password);
     }
 
+    public function testFinalFormsDeclareAccessibleLabelsAndUseTheirRenderedErrorIds(): void
+    {
+        foreach ([
+            'RegistrationType.php' => ['form.name', 'form.email', 'form.password', 'form.password_confirmation'],
+            'ProfileType.php' => ['form.name', 'form.email'],
+            'PasswordChangeType.php' => ['form.current_password', 'form.new_password', 'form.password_confirmation'],
+            'ResetPasswordType.php' => ['form.password', 'form.password_confirmation'],
+            'DeleteAccountType.php' => ['form.current_password', 'form.delete_confirmation'],
+        ] as $file => $labels) {
+            $source = $this->resource('src/Form/'.$file);
+
+            foreach ($labels as $label) {
+                self::assertStringContainsString("'label' => '".$label."'", $source, $file.' '.$label);
+            }
+        }
+
+        foreach (['LoginController.php', 'MagicLinkController.php', 'PasswordResetController.php', 'VerificationController.php'] as $file) {
+            self::assertStringContainsString("'label' => 'form.email'", $this->resource('src/Controller/'.$file), $file);
+        }
+
+        foreach ([
+            'templates/security/login.html.twig' => 'magic_link_form.email.vars.id',
+            'templates/security/check_email.html.twig' => 'resend_form.email.vars.id',
+            'templates/password/request.html.twig' => 'form.email.vars.id',
+        ] as $path => $formIdExpression) {
+            $template = $this->resource($path);
+            self::assertStringContainsString($formIdExpression." ~ '_errors'", $template, $path);
+            self::assertStringNotContainsString('email_email_errors', $template, $path);
+        }
+    }
+
+    public function testRegistrationRendersNameBeforeEmailAndLoginLinksToPasswordRecovery(): void
+    {
+        $registration = $this->resource('templates/registration/register.html.twig');
+        $namePosition = strpos($registration, 'form.name');
+        $emailPosition = strpos($registration, 'form.email');
+        $restPosition = strpos($registration, 'form_rest(form)');
+
+        self::assertIsInt($namePosition);
+        self::assertIsInt($emailPosition);
+        self::assertIsInt($restPosition);
+        self::assertLessThan($emailPosition, $namePosition);
+        self::assertLessThan($restPosition, $emailPosition);
+
+        self::assertStringContainsString("path('app_forgot_password_request')", $this->resource('templates/security/login.html.twig'));
+    }
+
+    public function testAlertDialogClosesBeforeNativeFormSubmission(): void
+    {
+        $test = dirname(__DIR__, 2).'/Fixtures/alert-dialog-controller.test.mjs';
+        $controller = $this->applicationResources().'/assets/controllers/alert_dialog_controller.js';
+        $process = new Process(['node', $test, $controller]);
+        $process->run();
+
+        self::assertTrue($process->isSuccessful(), $process->getErrorOutput().$process->getOutput());
+    }
+
     public function testTwigYamlTranslationSvgAndBrowserOnlyBehaviorPassStaticGates(): void
     {
         $validator = new StaticResourceValidator();

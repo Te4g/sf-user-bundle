@@ -70,6 +70,7 @@ final class MagicLinkController extends AbstractController
             'action' => $this->generateUrl('app_login_link_request'),
             'method' => Request::METHOD_POST,
         ])->add('email', EmailType::class, [
+            'label' => 'form.email',
             'attr' => ['autocomplete' => 'email'],
             'constraints' => [new Assert\NotBlank(), new Assert\Email()],
         ])->getForm();
