@@ -46,4 +46,9 @@ final class GenerationFailed extends \RuntimeException
     {
         return new self(sprintf('%s: planned %s target changed', $path, $operation));
     }
+
+    public static function missingLockedIcon(string $path): self
+    {
+        return new self(sprintf('%s: locked offline icon is missing', $path));
+    }
 }
