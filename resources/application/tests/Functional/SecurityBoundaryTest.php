@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional;
 
 use App\Entity\ResetPasswordRequest;
+use Psr\Cache\CacheItemPoolInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use SymfonyCasts\Bundle\ResetPassword\ResetPasswordHelperInterface;
@@ -123,7 +124,7 @@ final class SecurityBoundaryTest extends AccountWebTestCase
         }
     }
 
-    public function testLimiterStateAccumulatesInsideAKernelAndResetsWithAFreshKernel(): void
+    public function testLimiterStateSurvivesKernelRebootsUntilThePoolIsExplicitlyCleared(): void
     {
         $key = 'task-10-repeat-run-isolation';
         $factory = static::getContainer()->get('limiter.account_registration');
@@ -139,13 +140,17 @@ final class SecurityBoundaryTest extends AccountWebTestCase
         $this->client = static::createClient();
         $freshFactory = static::getContainer()->get('limiter.account_registration');
         self::assertInstanceOf(RateLimiterFactoryInterface::class, $freshFactory);
+        self::assertFalse($freshFactory->create($key)->consume()->isAccepted());
+
+        $pool = static::getContainer()->get('cache.account_test_rate_limiter');
+        self::assertInstanceOf(CacheItemPoolInterface::class, $pool);
+        self::assertTrue($pool->clear());
         self::assertTrue($freshFactory->create($key)->consume()->isAccepted());
     }
 
-    public function testMagicLinkEndpointLimiterAccumulatesAcrossRequestsWithoutKernelReboot(): void
+    public function testMagicLinkEndpointLimiterAccumulatesAcrossKernelReboots(): void
     {
         $this->createUser('endpoint-limit@example.com');
-        $this->client->disableReboot();
 
         for ($attempt = 1; $attempt <= 5; ++$attempt) {
             $crawler = $this->client->request('GET', $this->url('app_login'));
@@ -153,7 +158,7 @@ final class SecurityBoundaryTest extends AccountWebTestCase
                 'form[email]' => 'endpoint-limit@example.com',
             ]));
             self::assertResponseRedirects($this->url('app_check_email'));
-            self::assertEmailCount($attempt);
+            self::assertEmailCount(1);
         }
 
         $crawler = $this->client->request('GET', $this->url('app_login'));
@@ -161,7 +166,7 @@ final class SecurityBoundaryTest extends AccountWebTestCase
             'form[email]' => 'endpoint-limit@example.com',
         ]));
         self::assertResponseRedirects($this->url('app_check_email'));
-        self::assertEmailCount(5);
+        self::assertEmailCount(0);
     }
 
     public function testEmailAddressSubmissionEndpointsHaveNeutralKnownAndUnknownResponses(): void

@@ -8,6 +8,7 @@ use App\Entity\ResetPasswordRequest;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Cache\CacheItemPoolInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -27,6 +28,9 @@ abstract class AccountWebTestCase extends WebTestCase
 
         ObservableTestLogger::clear();
         $this->client = static::createClient();
+        $limiterPool = static::getContainer()->get('cache.account_test_rate_limiter');
+        self::assertInstanceOf(CacheItemPoolInterface::class, $limiterPool);
+        self::assertTrue($limiterPool->clear());
         $entityManager = $this->entityManager();
         $entityManager->createQuery('DELETE FROM '.ResetPasswordRequest::class)->execute();
         $entityManager->createQuery('DELETE FROM '.User::class)->execute();

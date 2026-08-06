@@ -2,7 +2,7 @@ framework:
     cache:
         pools:
             cache.account_test_rate_limiter:
-                adapter: cache.adapter.array
+                adapter: cache.adapter.filesystem
     rate_limiter:
         account_login:
             cache_pool: cache.account_test_rate_limiter
@@ -22,4 +22,20 @@ services:
         public: true
     logger:
         alias: App\Tests\Functional\ObservableTestLogger
+        public: true
+    monolog.logger.request:
+        alias: App\Tests\Functional\ObservableTestLogger
+        public: true
+    monolog.logger.security:
+        alias: App\Tests\Functional\ObservableTestLogger
+        public: true
+    App\Tests\Functional\ObservableRequestTestLogger:
+        class: App\Tests\Functional\ObservableTestLogger
+        decorates: monolog.logger.request
+        decoration_on_invalid: ignore
+        public: true
+    App\Tests\Functional\ObservableSecurityTestLogger:
+        class: App\Tests\Functional\ObservableTestLogger
+        decorates: monolog.logger.security
+        decoration_on_invalid: ignore
         public: true

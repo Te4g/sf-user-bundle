@@ -61,6 +61,9 @@ final class GeneratedTestsResourcesTest extends TestCase
         self::assertStringContainsString("createQuery('DELETE FROM '.ResetPasswordRequest::class)", $helper);
         self::assertStringContainsString("createQuery('DELETE FROM '.User::class)", $helper);
         self::assertStringContainsString('ObservableTestLogger::clear()', $helper);
+        self::assertStringContainsString('CacheItemPoolInterface::class', $helper);
+        self::assertStringContainsString("get('cache.account_test_rate_limiter')", $helper);
+        self::assertStringContainsString('->clear()', $helper);
     }
 
     public function testRenderedTemplatedEmailClearsContextAndTheExtractorReadsADecodedAbsoluteHref(): void
@@ -111,7 +114,7 @@ final class GeneratedTestsResourcesTest extends TestCase
     {
         $configuration = Yaml::parseFile($this->applicationResources().'/config/packages/test/account_tests.yaml');
         self::assertSame(
-            'cache.adapter.array',
+            'cache.adapter.filesystem',
             $configuration['framework']['cache']['pools']['cache.account_test_rate_limiter']['adapter'] ?? null,
         );
 
@@ -130,10 +133,20 @@ final class GeneratedTestsResourcesTest extends TestCase
             );
         }
 
-        self::assertSame(
-            'App\Tests\Functional\ObservableTestLogger',
-            $configuration['services']['logger']['alias'] ?? null,
-        );
+        foreach (['logger', 'monolog.logger.request', 'monolog.logger.security'] as $loggerService) {
+            self::assertSame(
+                'App\Tests\Functional\ObservableTestLogger',
+                $configuration['services'][$loggerService]['alias'] ?? null,
+                $loggerService,
+            );
+        }
+        foreach ([
+            'App\\Tests\\Functional\\ObservableRequestTestLogger' => 'monolog.logger.request',
+            'App\\Tests\\Functional\\ObservableSecurityTestLogger' => 'monolog.logger.security',
+        ] as $decorator => $channel) {
+            self::assertSame($channel, $configuration['services'][$decorator]['decorates'] ?? null, $decorator);
+            self::assertSame('ignore', $configuration['services'][$decorator]['decoration_on_invalid'] ?? null, $decorator);
+        }
         $logger = $this->applicationResources().'/tests/Functional/ObservableTestLogger.php';
         self::assertFileExists($logger);
         require_once $logger;
@@ -143,12 +156,17 @@ final class GeneratedTestsResourcesTest extends TestCase
         }
         $logger = (new \ReflectionClass(\App\Tests\Functional\ObservableTestLogger::class))->newInstance();
         (new \ReflectionMethod($loggerClass, 'clear'))->invoke(null);
-        (new \ReflectionMethod($loggerClass, 'info'))->invoke($logger, 'application security probe for {route}', ['route' => 'app_login']);
+        (new \ReflectionMethod($loggerClass, 'info'))->invoke(
+            $logger,
+            'application security probe',
+            ['route' => 'app_login', 'password' => 'submitted-secret'],
+        );
         self::assertSame(1, (new \ReflectionMethod($loggerClass, 'count'))->invoke(null));
         $contents = (new \ReflectionMethod($loggerClass, 'contents'))->invoke(null);
         self::assertIsString($contents);
         self::assertStringContainsString('application security probe', $contents);
         self::assertStringContainsString('app_login', $contents);
+        self::assertStringContainsString('submitted-secret', $contents);
     }
 
     public function testGeneratedSuitesSubstantivelyCoverTheApprovedAccountLifecycle(): void
@@ -181,8 +199,8 @@ final class GeneratedTestsResourcesTest extends TestCase
                 'testEveryStateChangingFormRejectsAnInvalidCsrfToken',
                 'testResetFormRejectsInvalidCsrfWithoutConsumingTheToken',
                 'testEveryConfiguredAccountLimiterAcceptsFiveAttemptsAndRejectsTheSixth',
-                'testLimiterStateAccumulatesInsideAKernelAndResetsWithAFreshKernel',
-                'testMagicLinkEndpointLimiterAccumulatesAcrossRequestsWithoutKernelReboot',
+                'testLimiterStateSurvivesKernelRebootsUntilThePoolIsExplicitlyCleared',
+                'testMagicLinkEndpointLimiterAccumulatesAcrossKernelReboots',
                 'testEmailAddressSubmissionEndpointsHaveNeutralKnownAndUnknownResponses',
                 'testSubmittedPasswordsAreAbsentFromResponsesAndApplicationLogs',
             ],
@@ -293,19 +311,20 @@ final class GeneratedTestsResourcesTest extends TestCase
 
         $limiterIsolation = $this->methodSource(
             $this->resource('tests/Functional/SecurityBoundaryTest.php'),
-            'testLimiterStateAccumulatesInsideAKernelAndResetsWithAFreshKernel',
+            'testLimiterStateSurvivesKernelRebootsUntilThePoolIsExplicitlyCleared',
         );
-        foreach (['task-10-repeat-run-isolation', 'ensureKernelShutdown()', 'static::createClient()', 'assertFalse', 'assertTrue'] as $required) {
+        foreach (['task-10-repeat-run-isolation', 'ensureKernelShutdown()', 'static::createClient()', 'CacheItemPoolInterface::class', '->clear()', 'assertFalse', 'assertTrue'] as $required) {
             self::assertStringContainsString($required, $limiterIsolation, $required);
         }
 
         $endpointLimiter = $this->methodSource(
             $this->resource('tests/Functional/SecurityBoundaryTest.php'),
-            'testMagicLinkEndpointLimiterAccumulatesAcrossRequestsWithoutKernelReboot',
+            'testMagicLinkEndpointLimiterAccumulatesAcrossKernelReboots',
         );
-        foreach (['disableReboot()', 'app_login_link_request', 'endpoint-limit@example.com', 'assertEmailCount(5)'] as $required) {
+        foreach (['app_login_link_request', 'endpoint-limit@example.com', 'assertEmailCount(1)', 'assertEmailCount(0)'] as $required) {
             self::assertStringContainsString($required, $endpointLimiter, $required);
         }
+        self::assertStringNotContainsString('disableReboot()', $endpointLimiter);
     }
 
     /** @return list<string> */
