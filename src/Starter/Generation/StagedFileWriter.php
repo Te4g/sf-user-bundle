@@ -115,6 +115,10 @@ final readonly class StagedFileWriter
     private function replaceTarget(string $source, string $target, PlannedResource $resource): void
     {
         $this->assertReplacementTarget($target, $resource);
+        $permissions = fileperms($target);
+        if (false === $permissions) {
+            throw GenerationFailed::plannedTargetChanged($resource->relativePath(), 'replacement');
+        }
         $temporaryTarget = tempnam(dirname($target), '.te4g-starter-');
         if (false === $temporaryTarget) {
             throw GenerationFailed::cannotWrite($target);
@@ -122,6 +126,9 @@ final readonly class StagedFileWriter
 
         try {
             $this->copy($source, $temporaryTarget);
+            if (!chmod($temporaryTarget, $permissions & 0777)) {
+                throw GenerationFailed::cannotWrite($target);
+            }
             $this->assertReplacementTarget($target, $resource);
             if (!rename($temporaryTarget, $target)) {
                 throw GenerationFailed::cannotWrite($target);
