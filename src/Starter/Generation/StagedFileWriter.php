@@ -17,7 +17,7 @@ final readonly class StagedFileWriter
     {
         $plan->throwIfConflicted();
         $temporaryDirectory = sys_get_temp_dir().'/te4g-starter-generation-'.bin2hex(random_bytes(8));
-        if (!mkdir($temporaryDirectory, 0700, true)) {
+        if (!mkdir($temporaryDirectory, 0700, true) || !chmod($temporaryDirectory, 0700)) {
             throw GenerationFailed::stagingUnavailable();
         }
         $temporaryIdentity = lstat($temporaryDirectory);
@@ -71,11 +71,9 @@ final readonly class StagedFileWriter
         }
 
         $directory = dirname($destination);
-        if (!is_dir($directory) && !mkdir($directory, 0700, true)) {
-            throw GenerationFailed::cannotWrite($destination);
-        }
+        $this->createDirectories($directory, 0700, $destination);
 
-        if (!copy($source, $destination)) {
+        if (!copy($source, $destination) || !chmod($destination, 0600)) {
             throw GenerationFailed::cannotWrite($destination);
         }
     }
@@ -83,12 +81,16 @@ final readonly class StagedFileWriter
     private function createTarget(string $source, string $target, string $relativePath): void
     {
         $directory = dirname($target);
-        if (!is_dir($directory) && !mkdir($directory, 0755, true)) {
-            throw GenerationFailed::cannotWrite($target);
+        $this->createDirectories($directory, 0755, $target);
+
+        $input = fopen($source, 'rb');
+        if (false === $input) {
+            throw GenerationFailed::unreadableResource($source);
         }
 
         $destination = @fopen($target, 'xb');
         if (false === $destination) {
+            fclose($input);
             if (file_exists($target) || is_link($target)) {
                 throw GenerationFailed::plannedTargetChanged($relativePath, 'create');
             }
@@ -96,19 +98,124 @@ final readonly class StagedFileWriter
             throw GenerationFailed::cannotWrite($target);
         }
 
-        $input = fopen($source, 'rb');
-        if (false === $input) {
+        $identity = fstat($destination);
+        if (false === $identity) {
+            fclose($input);
             fclose($destination);
-            throw GenerationFailed::unreadableResource($source);
+            throw GenerationFailed::cannotWrite($target);
         }
 
+        $complete = false;
         try {
             if (false === stream_copy_to_stream($input, $destination)) {
                 throw GenerationFailed::cannotWrite($target);
             }
+
+            if (!fflush($destination)) {
+                throw GenerationFailed::cannotWrite($target);
+            }
+
+            clearstatcache(true, $target);
+            $targetIdentity = lstat($target);
+            if (false === $targetIdentity
+                || is_link($target)
+                || !is_file($target)
+                || !$this->sameIdentity($identity, $targetIdentity)) {
+                throw GenerationFailed::plannedTargetChanged($relativePath, 'create');
+            }
+
+            if (!chmod($target, 0644)) {
+                throw GenerationFailed::cannotWrite($target);
+            }
+
+            clearstatcache(true, $target);
+            $normalizedIdentity = lstat($target);
+            $normalizedPermissions = fileperms($target);
+            if (false === $normalizedIdentity
+                || false === $normalizedPermissions
+                || is_link($target)
+                || !is_file($target)
+                || !$this->sameIdentity($identity, $normalizedIdentity)
+                || ($normalizedPermissions & 0777) !== 0644) {
+                throw GenerationFailed::plannedTargetChanged($relativePath, 'create');
+            }
+
+            $complete = true;
         } finally {
             fclose($input);
             fclose($destination);
+
+            if (!$complete) {
+                $this->removeCreatedFile($target, $identity);
+            }
+        }
+    }
+
+    private function createDirectories(string $directory, int $permissions, string $target): void
+    {
+        if (is_dir($directory)) {
+            return;
+        }
+
+        $missingDirectories = [];
+        $candidate = $directory;
+        while (!is_dir($candidate)) {
+            if (file_exists($candidate) || is_link($candidate)) {
+                throw GenerationFailed::cannotWrite($target);
+            }
+
+            $missingDirectories[] = $candidate;
+            $parent = dirname($candidate);
+            if ($parent === $candidate) {
+                throw GenerationFailed::cannotWrite($target);
+            }
+            $candidate = $parent;
+        }
+
+        foreach (array_reverse($missingDirectories) as $missingDirectory) {
+            if (!@mkdir($missingDirectory, $permissions)) {
+                throw GenerationFailed::cannotWrite($target);
+            }
+
+            $identity = lstat($missingDirectory);
+            if (false === $identity
+                || is_link($missingDirectory)
+                || !is_dir($missingDirectory)
+                || !chmod($missingDirectory, $permissions)) {
+                throw GenerationFailed::cannotWrite($target);
+            }
+
+            clearstatcache(true, $missingDirectory);
+            $normalizedIdentity = lstat($missingDirectory);
+            $normalizedPermissions = fileperms($missingDirectory);
+            if (false === $normalizedIdentity
+                || false === $normalizedPermissions
+                || !$this->sameIdentity($identity, $normalizedIdentity)
+                || ($normalizedPermissions & 0777) !== $permissions) {
+                throw GenerationFailed::cannotWrite($target);
+            }
+        }
+    }
+
+    /**
+     * @param array<int|string, int> $expected
+     * @param array<int|string, int> $actual
+     */
+    private function sameIdentity(array $expected, array $actual): bool
+    {
+        return $expected['dev'] === $actual['dev'] && $expected['ino'] === $actual['ino'];
+    }
+
+    /** @param array<int|string, int> $expectedIdentity */
+    private function removeCreatedFile(string $target, array $expectedIdentity): void
+    {
+        clearstatcache(true, $target);
+        $actualIdentity = lstat($target);
+        if (false !== $actualIdentity
+            && !is_link($target)
+            && is_file($target)
+            && $this->sameIdentity($expectedIdentity, $actualIdentity)) {
+            unlink($target);
         }
     }
 
