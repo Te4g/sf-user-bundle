@@ -12,7 +12,7 @@
         <env name="APP_DEBUG" value="0"/>
     </php>
     <testsuites>
-        <testsuite name="Te4g User Bundle">
+        <testsuite name="Te4g Starter (including transitional legacy bundle tests)">
             <directory>tests</directory>
         </testsuite>
     </testsuites>
