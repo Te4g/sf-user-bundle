@@ -16,6 +16,7 @@ use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
+use Symfony\Contracts\Translation\TranslatorInterface;
 use SymfonyCasts\Bundle\ResetPassword\Generator\ResetPasswordRandomGenerator;
 use SymfonyCasts\Bundle\ResetPassword\Generator\ResetPasswordTokenGenerator;
 use SymfonyCasts\Bundle\ResetPassword\ResetPasswordHelper;
@@ -182,7 +183,11 @@ final class SelfAdministrationDoctrineTest extends TestCase
             $this->userRepository($this->entityManager),
             $this->newApplicationInstance('Account\\EmailNormalizer'),
             $helper,
-            $this->newApplicationInstance('Mailer\\AccountMailer', $this->createStub(MailerInterface::class)),
+            $this->newApplicationInstance(
+                'Mailer\\AccountMailer',
+                $this->createStub(MailerInterface::class),
+                $this->createStub(TranslatorInterface::class),
+            ),
             $this->resetRequestRepository($this->entityManager),
         ];
         $service = new \ReflectionClass($this->applicationClass('Account\\ProfileService'));
@@ -218,7 +223,11 @@ final class SelfAdministrationDoctrineTest extends TestCase
             $this->resetRequestRepository($this->entityManager),
             new TransitionPasswordHasher(),
             $this->createStub(UrlGeneratorInterface::class),
-            $this->newApplicationInstance('Mailer\\AccountMailer', $this->createStub(MailerInterface::class)),
+            $this->newApplicationInstance(
+                'Mailer\\AccountMailer',
+                $this->createStub(MailerInterface::class),
+                $this->createStub(TranslatorInterface::class),
+            ),
             $this->entityManager,
         );
     }

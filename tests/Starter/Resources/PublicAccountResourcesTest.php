@@ -142,6 +142,32 @@ final class PublicAccountResourcesTest extends TestCase
         self::assertStringContainsString("'data_class' => ResetPasswordInput::class", $resetType);
     }
 
+    public function testRenderedValidationAndControllerErrorsUseCatalogueKeys(): void
+    {
+        foreach (['RegistrationType.php', 'PasswordChangeType.php', 'ResetPasswordType.php'] as $file) {
+            $source = $this->resource('src/Form/'.$file);
+
+            self::assertStringContainsString("'invalid_message' => 'password.mismatch'", $source, $file);
+            self::assertStringNotContainsString('The password fields must match.', $source, $file);
+        }
+
+        $deleteInput = $this->resource('src/Form/Model/DeleteAccountInput.php');
+        self::assertStringContainsString("#[Assert\\IsTrue(message: 'account.delete_confirmation_required')]", $deleteInput);
+        self::assertStringNotContainsString('You must confirm account deletion.', $deleteInput);
+
+        $profileController = $this->resource('src/Controller/ProfileController.php');
+        self::assertSame(2, substr_count($profileController, "new FormError('profile.change_failed')"));
+        self::assertStringNotContainsString('Unable to update your account.', $profileController);
+
+        $passwordController = $this->resource('src/Controller/PasswordController.php');
+        self::assertStringContainsString("new FormError('password_change.failed')", $passwordController);
+        self::assertStringNotContainsString('Unable to update your account.', $passwordController);
+
+        $deleteController = $this->resource('src/Controller/DeleteAccountController.php');
+        self::assertStringContainsString("new FormError('account.deletion_failed')", $deleteController);
+        self::assertStringNotContainsString('Unable to delete your account.', $deleteController);
+    }
+
     public function testMailerUsesEditableApplicationDefaultsAndApplicationTemplates(): void
     {
         $source = $this->resource('src/Mailer/AccountMailer.php');

@@ -22,7 +22,7 @@ final class PasswordChangeType extends AbstractType
             ])
             ->add('plainPassword', RepeatedType::class, [
                 'type' => PasswordType::class,
-                'invalid_message' => 'The password fields must match.',
+                'invalid_message' => 'password.mismatch',
                 'first_options' => [
                     'label' => 'form.new_password',
                     'attr' => ['autocomplete' => 'new-password'],

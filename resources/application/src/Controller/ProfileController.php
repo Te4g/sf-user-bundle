@@ -47,7 +47,7 @@ final class ProfileController extends AbstractController
 
                 return $this->redirectToRoute('app_account');
             } catch (\RuntimeException) {
-                $form->addError(new FormError('Unable to update your account.'));
+                $form->addError(new FormError('profile.change_failed'));
             }
         }
 
@@ -74,7 +74,7 @@ final class ProfileController extends AbstractController
 
             return $this->redirectToRoute('app_account');
         } catch (\RuntimeException) {
-            $form->addError(new FormError('Unable to update your account.'));
+            $form->addError(new FormError('profile.change_failed'));
         }
 
         return $this->renderProfile($user, $form, Response::HTTP_UNPROCESSABLE_ENTITY);

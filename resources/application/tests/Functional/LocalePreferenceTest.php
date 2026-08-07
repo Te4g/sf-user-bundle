@@ -10,6 +10,7 @@ use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\DomCrawler\Form;
 use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Mime\Email;
 
 final class LocalePreferenceTest extends AccountWebTestCase
 {
@@ -134,6 +135,30 @@ final class LocalePreferenceTest extends AccountWebTestCase
         $user = $this->user('locale-registration@example.com');
         self::assertInstanceOf(User::class, $user);
         self::assertSame('fr', $this->refreshUser($user)->getLocale());
+        self::assertEmailCount(1);
+        $email = self::getMailerMessage();
+        self::assertInstanceOf(Email::class, $email);
+        self::assertSame('Vérifiez votre adresse e-mail', $email->getSubject());
+        self::assertStringContainsString('Vérifiez votre adresse e-mail', (string) $email->getHtmlBody());
+    }
+
+    public function testRegistrationRendersMismatchedPasswordsInFrench(): void
+    {
+        $this->client->setServerParameter('HTTP_ACCEPT_LANGUAGE', 'fr-FR,fr;q=0.9,en;q=0.8');
+        $crawler = $this->client->request('GET', $this->url('app_register'));
+        $form = $crawler->filter('form[name="registration"]')->form([
+            'registration[name]' => 'Locale User',
+            'registration[email]' => 'locale-mismatch@example.com',
+            'registration[plainPassword][first]' => 'correct horse battery staple',
+            'registration[plainPassword][second]' => 'different horse battery staple',
+        ]);
+
+        $this->client->submit($form);
+
+        self::assertResponseStatusCodeSame(Response::HTTP_UNPROCESSABLE_ENTITY);
+        $content = (string) $this->client->getResponse()->getContent();
+        self::assertStringContainsString('Les champs de mot de passe doivent correspondre.', $content);
+        self::assertStringNotContainsString('The password fields must match.', $content);
     }
 
     private function localeForm(Crawler $crawler): Form

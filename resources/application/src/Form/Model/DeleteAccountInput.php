@@ -11,6 +11,6 @@ final class DeleteAccountInput
     #[Assert\NotBlank]
     public string $currentPassword = '';
 
-    #[Assert\IsTrue(message: 'You must confirm account deletion.')]
+    #[Assert\IsTrue(message: 'account.delete_confirmation_required')]
     public bool $confirm = false;
 }

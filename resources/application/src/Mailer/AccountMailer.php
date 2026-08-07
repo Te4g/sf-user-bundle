@@ -8,11 +8,13 @@ use App\Entity\User;
 use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Address;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 final readonly class AccountMailer
 {
     public function __construct(
         private MailerInterface $mailer,
+        private TranslatorInterface $translator,
         private string $fromEmail = 'no-reply@example.com',
         private string $fromName = 'Application',
     ) {
@@ -20,17 +22,35 @@ final readonly class AccountMailer
 
     public function sendVerification(User $user, string $absoluteUrl): void
     {
-        $this->send($user->getEmail(), 'Verify your email address', 'email/verify.html.twig', $absoluteUrl);
+        $this->send(
+            $user->getEmail(),
+            $user->getLocale(),
+            'email.verification.subject',
+            'email/verify.html.twig',
+            $absoluteUrl,
+        );
     }
 
     public function sendMagicLink(User $user, string $absoluteUrl): void
     {
-        $this->send($user->getEmail(), 'Your sign-in link', 'email/magic_link.html.twig', $absoluteUrl);
+        $this->send(
+            $user->getEmail(),
+            $user->getLocale(),
+            'email.magic_link.subject',
+            'email/magic_link.html.twig',
+            $absoluteUrl,
+        );
     }
 
     public function sendPasswordReset(User $user, string $absoluteUrl): void
     {
-        $this->send($user->getEmail(), 'Reset your password', 'email/password_reset.html.twig', $absoluteUrl);
+        $this->send(
+            $user->getEmail(),
+            $user->getLocale(),
+            'email.password_reset.subject',
+            'email/password_reset.html.twig',
+            $absoluteUrl,
+        );
     }
 
     public function sendEmailChange(User $user, string $absoluteUrl): void
@@ -40,16 +60,28 @@ final readonly class AccountMailer
             return;
         }
 
-        $this->send($pendingEmail, 'Confirm your new email address', 'email/email_change.html.twig', $absoluteUrl);
+        $this->send(
+            $pendingEmail,
+            $user->getLocale(),
+            'email.email_change.subject',
+            'email/email_change.html.twig',
+            $absoluteUrl,
+        );
     }
 
-    private function send(string $recipient, string $subject, string $template, string $absoluteUrl): void
-    {
+    private function send(
+        string $recipient,
+        string $locale,
+        string $subjectKey,
+        string $template,
+        string $absoluteUrl,
+    ): void {
         $email = (new TemplatedEmail())
             ->from(new Address($this->fromEmail, $this->fromName))
             ->to($recipient)
-            ->subject($subject)
+            ->subject($this->translator->trans($subjectKey, locale: $locale))
             ->htmlTemplate($template)
+            ->locale($locale)
             ->context(['absolute_url' => $absoluteUrl])
         ;
 

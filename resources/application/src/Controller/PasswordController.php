@@ -35,7 +35,7 @@ final class PasswordController extends AbstractController
 
                 return $this->redirectToRoute('app_account');
             } catch (\RuntimeException) {
-                $form->addError(new FormError('Unable to update your account.'));
+                $form->addError(new FormError('password_change.failed'));
             }
         }
 

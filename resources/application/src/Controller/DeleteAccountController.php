@@ -37,7 +37,7 @@ final class DeleteAccountController extends AbstractController
             try {
                 $this->deletion->delete($user, $input->currentPassword);
             } catch (\RuntimeException) {
-                $form->addError(new FormError('Unable to delete your account.'));
+                $form->addError(new FormError('account.deletion_failed'));
 
                 return $this->renderDeleteForm($user, $form->createView(), Response::HTTP_UNPROCESSABLE_ENTITY);
             }
