@@ -16,12 +16,14 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 final class ProfileController extends AbstractController
 {
     public function __construct(
         private readonly ProfileService $profile,
         private readonly AccountRequestLimiter $requestLimiter,
+        private readonly TranslatorInterface $translator,
     ) {
     }
 
@@ -47,7 +49,7 @@ final class ProfileController extends AbstractController
 
                 return $this->redirectToRoute('app_account');
             } catch (\RuntimeException) {
-                $form->addError(new FormError('profile.change_failed'));
+                $form->addError(new FormError($this->translator->trans('profile.change_failed')));
             }
         }
 
@@ -74,7 +76,7 @@ final class ProfileController extends AbstractController
 
             return $this->redirectToRoute('app_account');
         } catch (\RuntimeException) {
-            $form->addError(new FormError('profile.change_failed'));
+            $form->addError(new FormError($this->translator->trans('profile.change_failed')));
         }
 
         return $this->renderProfile($user, $form, Response::HTTP_UNPROCESSABLE_ENTITY);

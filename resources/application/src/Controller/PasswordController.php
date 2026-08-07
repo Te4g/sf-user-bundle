@@ -14,11 +14,14 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 final class PasswordController extends AbstractController
 {
-    public function __construct(private readonly PasswordService $password)
-    {
+    public function __construct(
+        private readonly PasswordService $password,
+        private readonly TranslatorInterface $translator,
+    ) {
     }
 
     #[Route('/account/password', name: 'app_account_password', methods: ['GET', 'POST'])]
@@ -35,7 +38,7 @@ final class PasswordController extends AbstractController
 
                 return $this->redirectToRoute('app_account');
             } catch (\RuntimeException) {
-                $form->addError(new FormError('password_change.failed'));
+                $form->addError(new FormError($this->translator->trans('password_change.failed')));
             }
         }
 

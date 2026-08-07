@@ -39,6 +39,23 @@ final class LocalePreferenceTest extends AccountWebTestCase
         self::assertSame('en', $this->localeForm($crawler)['locale']->getValue());
     }
 
+    public function testAnonymousLocaleSelectionPersistsThroughCookieOnSubsequentRequest(): void
+    {
+        $this->client->setServerParameter('HTTP_ACCEPT_LANGUAGE', 'en-US,en;q=0.9');
+        $crawler = $this->client->request('GET', $this->url('app_home'));
+
+        $this->client->submit($this->localeForm($crawler), ['locale' => 'fr']);
+
+        self::assertResponseRedirects($this->url('app_home'));
+        $this->client->setServerParameter('HTTP_ACCEPT_LANGUAGE', 'en-US,en;q=0.9');
+        $crawler = $this->client->request('GET', $this->url('app_home'));
+
+        self::assertResponseIsSuccessful();
+        self::assertSame('fr', $crawler->filter('html')->attr('lang'));
+        self::assertSame('fr', $this->localeForm($crawler)['locale']->getValue());
+        self::assertSelectorTextContains('h1', 'La base de votre compte est prête.');
+    }
+
     public function testAuthenticatedPreferenceOverridesCookieAndPersistsAChange(): void
     {
         $user = $this->createUser('locale@example.com', locale: 'fr');
@@ -83,7 +100,7 @@ final class LocalePreferenceTest extends AccountWebTestCase
             '_token' => 'invalid',
         ]);
 
-        self::assertResponseStatusCodeSame(Response::HTTP_UNPROCESSABLE_ENTITY);
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
         self::assertFalse($this->client->getResponse()->headers->has('Set-Cookie'));
         self::assertSame($localeBefore, $this->refreshUser($user)->getLocale());
         self::assertSame($cookieBefore->getValue(), $this->client->getCookieJar()->get('app_locale')?->getValue());
@@ -167,6 +184,41 @@ final class LocalePreferenceTest extends AccountWebTestCase
         $content = (string) $this->client->getResponse()->getContent();
         self::assertStringContainsString('Les champs de mot de passe doivent correspondre.', $content);
         self::assertStringNotContainsString('The password fields must match.', $content);
+    }
+
+    public function testFrenchPublicAuthenticationAndAccountPagesRenderVisibleCopy(): void
+    {
+        $this->client->setServerParameter('HTTP_ACCEPT_LANGUAGE', 'fr-FR,fr;q=0.9,en;q=0.8');
+
+        $this->client->request('GET', $this->url('app_home'));
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('h1', 'La base de votre compte est prête.');
+
+        $this->client->request('GET', $this->url('app_login'));
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('h1', 'Se connecter');
+
+        $user = $this->createUser('french-account@example.com', locale: 'fr');
+        $this->client->loginUser($user);
+        $this->client->request('GET', $this->url('app_account'));
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('h1', 'Paramètres du compte');
+    }
+
+    public function testControllerAddedFailureRendersTranslatedFrenchCopy(): void
+    {
+        $user = $this->createUser('french-failure@example.com', true, 'old-password', 'fr');
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', $this->url('app_account_password'));
+        $this->client->submit($crawler->filter('form[name="password_change"]')->form([
+            'password_change[currentPassword]' => 'wrong-password',
+            'password_change[plainPassword][first]' => 'Correct Horse Battery Staple 42!',
+            'password_change[plainPassword][second]' => 'Correct Horse Battery Staple 42!',
+        ]));
+
+        self::assertResponseStatusCodeSame(Response::HTTP_UNPROCESSABLE_ENTITY);
+        self::assertSelectorTextContains('[role="alert"]', "Votre mot de passe n'a pas pu être modifié.");
+        self::assertStringNotContainsString('password_change.failed', (string) $this->client->getResponse()->getContent());
     }
 
     private function localeForm(Crawler $crawler): Form

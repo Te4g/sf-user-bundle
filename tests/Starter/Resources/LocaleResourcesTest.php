@@ -40,6 +40,7 @@ final class LocaleResourcesTest extends TestCase
 
         self::assertStringContainsString("#[Route('/locale', name: 'app_locale', methods: ['POST'])]", $controller);
         self::assertStringContainsString("new CsrfToken('locale_change'", $controller);
+        self::assertStringContainsString('Response::HTTP_FORBIDDEN', $controller);
         self::assertStringContainsString('Response::HTTP_UNPROCESSABLE_ENTITY', $controller);
         self::assertStringContainsString("Cookie::create('app_locale')", $controller);
         self::assertStringContainsString("withExpires(new \\DateTimeImmutable('+1 year'))", $controller);

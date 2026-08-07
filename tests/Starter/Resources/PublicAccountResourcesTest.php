@@ -155,17 +155,27 @@ final class PublicAccountResourcesTest extends TestCase
         self::assertStringContainsString("#[Assert\\IsTrue(message: 'account.delete_confirmation_required')]", $deleteInput);
         self::assertStringNotContainsString('You must confirm account deletion.', $deleteInput);
 
-        $profileController = $this->resource('src/Controller/ProfileController.php');
-        self::assertSame(2, substr_count($profileController, "new FormError('profile.change_failed')"));
-        self::assertStringNotContainsString('Unable to update your account.', $profileController);
+        foreach ([
+            'ProfileController.php' => ['profile.change_failed', 2, 'Unable to update your account.'],
+            'PasswordController.php' => ['password_change.failed', 1, 'Unable to update your account.'],
+            'DeleteAccountController.php' => ['account.deletion_failed', 1, 'Unable to delete your account.'],
+        ] as $file => [$key, $count, $legacyCopy]) {
+            $controller = $this->resource('src/Controller/'.$file);
 
-        $passwordController = $this->resource('src/Controller/PasswordController.php');
-        self::assertStringContainsString("new FormError('password_change.failed')", $passwordController);
-        self::assertStringNotContainsString('Unable to update your account.', $passwordController);
+            self::assertStringContainsString('use Symfony\\Contracts\\Translation\\TranslatorInterface;', $controller, $file);
+            self::assertStringContainsString('private readonly TranslatorInterface $translator', $controller, $file);
+            self::assertSame(
+                $count,
+                substr_count($controller, "new FormError(\$this->translator->trans('".$key."'))"),
+                $file,
+            );
+            self::assertStringNotContainsString("new FormError('".$key."')", $controller, $file);
+            self::assertStringNotContainsString($legacyCopy, $controller, $file);
+        }
 
-        $deleteController = $this->resource('src/Controller/DeleteAccountController.php');
-        self::assertStringContainsString("new FormError('account.deletion_failed')", $deleteController);
-        self::assertStringNotContainsString('Unable to delete your account.', $deleteController);
+        $formTheme = $this->resource('templates/form/account_theme.html.twig');
+        self::assertStringContainsString('{{ error.message }}', $formTheme);
+        self::assertStringNotContainsString('error.message|trans', $formTheme);
     }
 
     public function testMailerUsesEditableApplicationDefaultsAndApplicationTemplates(): void

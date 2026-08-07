@@ -222,10 +222,13 @@ final class GeneratedTestsResourcesTest extends TestCase
             ],
             'LocalePreferenceTest.php' => [
                 'testBrowserCookieAndEnglishFallbackResolveInOrder',
+                'testAnonymousLocaleSelectionPersistsThroughCookieOnSubsequentRequest',
                 'testAuthenticatedPreferenceOverridesCookieAndPersistsAChange',
                 'testLocaleChangeRejectsInvalidCsrfAndUnsupportedLocales',
                 'testLocaleChangeRejectsExternalAndBackslashReturnTargets',
                 'testRegistrationPersistsTheResolvedLocale',
+                'testFrenchPublicAuthenticationAndAccountPagesRenderVisibleCopy',
+                'testControllerAddedFailureRendersTranslatedFrenchCopy',
             ],
         ] as $file => $expectedMethods) {
             $methods = $this->methodNames($this->resource('tests/Functional/'.$file));
@@ -394,6 +397,14 @@ final class GeneratedTestsResourcesTest extends TestCase
             2,
             substr_count($rejectedLocaleChanges, "assertFalse(\$this->client->getResponse()->headers->has('Set-Cookie'))"),
         );
+        self::assertStringContainsString(
+            'assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN)',
+            $rejectedLocaleChanges,
+        );
+        self::assertStringContainsString(
+            'assertResponseStatusCodeSame(Response::HTTP_UNPROCESSABLE_ENTITY)',
+            $rejectedLocaleChanges,
+        );
     }
 
     public function testLocalePreferenceSuiteExercisesTheHttpBoundaryWithoutBrowserArtifacts(): void
@@ -415,6 +426,49 @@ final class GeneratedTestsResourcesTest extends TestCase
             $rejectedChanges,
         );
         self::assertStringNotContainsString("\$this->client->submit(\$form, ['locale' => 'de'])", $rejectedChanges);
+
+        $anonymousPersistence = $this->methodSource(
+            $suite,
+            'testAnonymousLocaleSelectionPersistsThroughCookieOnSubsequentRequest',
+        );
+        foreach ([
+            "\$this->client->submit(\$this->localeForm(\$crawler), ['locale' => 'fr'])",
+            "setServerParameter('HTTP_ACCEPT_LANGUAGE', 'en-US,en;q=0.9')",
+            "request('GET', \$this->url('app_home'))",
+            "assertSame('fr', \$crawler->filter('html')->attr('lang'))",
+            "assertSelectorTextContains('h1', 'La base de votre compte est prête.')",
+        ] as $required) {
+            self::assertStringContainsString($required, $anonymousPersistence, $required);
+        }
+
+        $visibleFrenchPages = $this->methodSource(
+            $suite,
+            'testFrenchPublicAuthenticationAndAccountPagesRenderVisibleCopy',
+        );
+        foreach ([
+            "'app_home'",
+            "'app_login'",
+            "'app_account'",
+            'La base de votre compte est prête.',
+            'Se connecter',
+            'Paramètres du compte',
+        ] as $required) {
+            self::assertStringContainsString($required, $visibleFrenchPages, $required);
+        }
+
+        $translatedFailure = $this->methodSource(
+            $suite,
+            'testControllerAddedFailureRendersTranslatedFrenchCopy',
+        );
+        foreach ([
+            "createUser('french-failure@example.com', true, 'old-password', 'fr')",
+            "'app_account_password'",
+            "'password_change[currentPassword]' => 'wrong-password'",
+            "assertSelectorTextContains('[role=\"alert\"]', \"Votre mot de passe n'a pas pu être modifié.\")",
+            "assertStringNotContainsString('password_change.failed'",
+        ] as $required) {
+            self::assertStringContainsString($required, $translatedFailure, $required);
+        }
     }
 
     /** @return list<string> */

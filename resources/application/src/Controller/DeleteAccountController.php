@@ -16,12 +16,14 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 final class DeleteAccountController extends AbstractController
 {
     public function __construct(
         private readonly AccountDeletionService $deletion,
         private readonly TokenStorageInterface $tokenStorage,
+        private readonly TranslatorInterface $translator,
     ) {
     }
 
@@ -37,7 +39,7 @@ final class DeleteAccountController extends AbstractController
             try {
                 $this->deletion->delete($user, $input->currentPassword);
             } catch (\RuntimeException) {
-                $form->addError(new FormError('account.deletion_failed'));
+                $form->addError(new FormError($this->translator->trans('account.deletion_failed')));
 
                 return $this->renderDeleteForm($user, $form->createView(), Response::HTTP_UNPROCESSABLE_ENTITY);
             }

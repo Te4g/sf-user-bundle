@@ -32,7 +32,7 @@ final readonly class LocaleController
     public function __invoke(Request $request): Response
     {
         if (!$this->csrf->isTokenValid(new CsrfToken('locale_change', $request->request->getString('_token')))) {
-            return new Response(status: Response::HTTP_UNPROCESSABLE_ENTITY);
+            return new Response(status: Response::HTTP_FORBIDDEN);
         }
 
         $locale = $request->request->getString('locale');
