@@ -108,6 +108,18 @@ printf 'Removing the generator before any database use...\n'
     if rg -n 'Te4g\\|te4g/starter|te4g_user' src config templates assets tests composer.json; then
         fail 'generated application paths still reference the starter package.'
     fi
+    for generated_path in \
+        config/packages/account_locale.yaml \
+        src/Locale/SupportedLocales.php \
+        src/EventSubscriber/LocaleSubscriber.php \
+        src/Controller/LocaleController.php \
+        templates/components/LanguageSwitcher.html.twig \
+        translations/messages.fr.xlf \
+        translations/validators.fr.xlf \
+        tests/Functional/LocalePreferenceTest.php
+    do
+        [ -f "$generated_path" ] || fail "generated application lost ${generated_path} after package removal."
+    done
     [ -f STARTER_LICENSES.md ] || fail 'generated application lost STARTER_LICENSES.md after package removal.'
     rg -q 'END OF TERMS AND CONDITIONS' STARTER_LICENSES.md \
         || fail 'generated application license file does not contain the complete GPL terms.'
@@ -121,6 +133,7 @@ printf 'Validating the independently owned generated application...\n'
     php bin/console lint:container --no-interaction
     php bin/console lint:yaml config --no-interaction
     php bin/console lint:twig templates --no-interaction
+    php bin/console lint:xliff translations --no-interaction
     php bin/console tailwind:build --no-interaction
     php bin/console debug:asset-map --no-interaction
 )

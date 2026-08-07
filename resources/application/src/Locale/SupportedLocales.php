@@ -5,13 +5,18 @@ declare(strict_types=1);
 namespace App\Locale;
 
 use App\Entity\User;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\Request;
 
 final readonly class SupportedLocales
 {
     /** @param array<string, string> $labels */
-    public function __construct(private array $labels, private string $defaultLocale)
-    {
+    public function __construct(
+        #[Autowire(param: 'app.supported_locales')]
+        private array $labels,
+        #[Autowire(param: 'kernel.default_locale')]
+        private string $defaultLocale,
+    ) {
         if (!isset($labels[$defaultLocale])) {
             throw new \InvalidArgumentException('The default locale must be supported.');
         }

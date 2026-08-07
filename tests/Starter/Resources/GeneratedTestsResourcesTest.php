@@ -396,6 +396,27 @@ final class GeneratedTestsResourcesTest extends TestCase
         );
     }
 
+    public function testLocalePreferenceSuiteExercisesTheHttpBoundaryWithoutBrowserArtifacts(): void
+    {
+        $suite = $this->resource('tests/Functional/LocalePreferenceTest.php');
+        $persistedChange = $this->methodSource(
+            $suite,
+            'testAuthenticatedPreferenceOverridesCookieAndPersistsAChange',
+        );
+        self::assertStringContainsString('$this->client->getResponse()->headers->getCookies()', $persistedChange);
+        self::assertStringNotContainsString("getCookieJar()->get('app_locale')", $persistedChange);
+
+        $rejectedChanges = $this->methodSource(
+            $suite,
+            'testLocaleChangeRejectsInvalidCsrfAndUnsupportedLocales',
+        );
+        self::assertStringContainsString(
+            "\$this->client->request('POST', \$this->url('app_locale'), [",
+            $rejectedChanges,
+        );
+        self::assertStringNotContainsString("\$this->client->submit(\$form, ['locale' => 'de'])", $rejectedChanges);
+    }
+
     /** @return list<string> */
     private function generatedTestPaths(): array
     {

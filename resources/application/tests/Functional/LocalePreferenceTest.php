@@ -55,8 +55,12 @@ final class LocalePreferenceTest extends AccountWebTestCase
 
         self::assertResponseRedirects($this->url('app_dashboard'));
         self::assertSame('en', $this->refreshUser($user)->getLocale());
-        $cookie = $this->client->getCookieJar()->get('app_locale');
-        self::assertInstanceOf(BrowserCookie::class, $cookie);
+        $responseCookies = array_values(array_filter(
+            $this->client->getResponse()->headers->getCookies(),
+            static fn (Cookie $cookie): bool => 'app_locale' === $cookie->getName(),
+        ));
+        self::assertCount(1, $responseCookies);
+        $cookie = $responseCookies[0];
         self::assertSame('en', $cookie->getValue());
         self::assertSame('/', $cookie->getPath());
         self::assertTrue($cookie->isHttpOnly());
@@ -86,7 +90,11 @@ final class LocalePreferenceTest extends AccountWebTestCase
 
         $crawler = $this->client->request('GET', $this->url('app_dashboard'));
         $form = $this->localeForm($crawler);
-        $this->client->submit($form, ['locale' => 'de']);
+        $this->client->request('POST', $this->url('app_locale'), [
+            'locale' => 'de',
+            '_token' => $form['_token']->getValue(),
+            'return_to' => $form['return_to']->getValue(),
+        ]);
 
         self::assertResponseStatusCodeSame(Response::HTTP_UNPROCESSABLE_ENTITY);
         self::assertFalse($this->client->getResponse()->headers->has('Set-Cookie'));

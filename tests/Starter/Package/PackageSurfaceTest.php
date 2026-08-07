@@ -53,4 +53,39 @@ final class PackageSurfaceTest extends TestCase
 
         self::assertStringNotContainsString('/reset-password/{token}', implode("\n", $currentDocumentation));
     }
+
+    public function testDocumentationExplainsTheGeneratedLocaleContract(): void
+    {
+        $readme = file_get_contents(__DIR__.'/../../../README.md');
+        self::assertIsString($readme);
+        self::assertStringContainsString('ext-intl', $readme);
+        self::assertStringContainsString('messages.en.xlf', $readme);
+        self::assertStringContainsString('messages.fr.xlf', $readme);
+        self::assertStringContainsString('User.locale', $readme);
+
+        $customization = file_get_contents(__DIR__.'/../../../docs/customization.md');
+        self::assertIsString($customization);
+        foreach ([
+            'User.locale',
+            'app_locale',
+            'Accept-Language',
+            'app.supported_locales',
+            '%app.supported_locales%',
+            'messages.fr.xlf',
+            'validators.fr.xlf',
+        ] as $expected) {
+            self::assertStringContainsString($expected, $customization);
+        }
+    }
+
+    public function testSecurityDocumentationExplainsTheLocaleCookieBoundary(): void
+    {
+        $securityGuide = file_get_contents(__DIR__.'/../../../docs/security.md');
+        self::assertIsString($securityGuide);
+        self::assertStringContainsString('app_locale', $securityGuide);
+        self::assertStringContainsString('allowlisted', $securityGuide);
+        self::assertStringContainsString('HTTP-only', $securityGuide);
+        self::assertStringContainsString('SameSite=Lax', $securityGuide);
+        self::assertStringContainsString('User.locale', $securityGuide);
+    }
 }

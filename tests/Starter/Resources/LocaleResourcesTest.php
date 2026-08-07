@@ -7,6 +7,7 @@ namespace Te4g\Starter\Tests\Resources;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Yaml\Yaml;
 
@@ -80,6 +81,28 @@ final class LocaleResourcesTest extends TestCase
     {
         self::assertSame($this->translationIds('messages.en.xlf'), $this->translationIds('messages.fr.xlf'));
         self::assertSame($this->translationIds('validators.en.xlf'), $this->translationIds('validators.fr.xlf'));
+    }
+
+    #[PreserveGlobalState(false)]
+    #[RunInSeparateProcess]
+    public function testGenericApplicationServiceDiscoveryCanAutowireSupportedLocales(): void
+    {
+        $this->requireApplicationClass('src/Locale/SupportedLocales.php');
+
+        $supportedLocalesClass = $this->applicationClass('Locale\\SupportedLocales');
+        $container = new ContainerBuilder();
+        $container->setParameter('app.supported_locales', ['en' => 'English', 'fr' => 'Français']);
+        $container->setParameter('kernel.default_locale', 'en');
+        $container->register($supportedLocalesClass, $supportedLocalesClass)
+            ->setAutowired(true)
+            ->setPublic(true);
+
+        $container->compile();
+
+        $locales = $container->get($supportedLocalesClass);
+        self::assertInstanceOf($supportedLocalesClass, $locales);
+        self::assertSame(['en', 'fr'], (new \ReflectionMethod($supportedLocalesClass, 'codes'))->invoke($locales));
+        self::assertSame('en', (new \ReflectionMethod($supportedLocalesClass, 'default'))->invoke($locales));
     }
 
     #[PreserveGlobalState(false)]

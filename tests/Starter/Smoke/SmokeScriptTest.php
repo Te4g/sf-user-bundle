@@ -53,10 +53,41 @@ final class SmokeScriptTest extends TestCase
         self::assertStringContainsString('END OF TERMS AND CONDITIONS', $script);
         self::assertStringContainsString('Lucide Icons and Contributors', $script);
         self::assertStringContainsString('make:migration', $script);
+        self::assertStringContainsString('php bin/console lint:xliff translations --no-interaction', $script);
         self::assertLessThan(
             strpos($script, 'make:migration'),
             strpos($script, 'te4g-starter install'),
         );
+
+        $packageRemoval = strpos($script, 'composer remove te4g/starter');
+        self::assertIsInt($packageRemoval);
+        $postRemovalScript = substr($script, $packageRemoval);
+        foreach ([
+            'config/packages/account_locale.yaml',
+            'src/Locale/SupportedLocales.php',
+            'src/EventSubscriber/LocaleSubscriber.php',
+            'src/Controller/LocaleController.php',
+            'templates/components/LanguageSwitcher.html.twig',
+            'translations/messages.fr.xlf',
+            'translations/validators.fr.xlf',
+            'tests/Functional/LocalePreferenceTest.php',
+        ] as $generatedPath) {
+            self::assertStringContainsString($generatedPath, $postRemovalScript);
+        }
+        self::assertStringContainsString('[ -f "$generated_path" ]', $postRemovalScript);
+
+        foreach ([
+            'php bin/console lint:xliff translations --no-interaction',
+            'php bin/console make:migration --no-interaction',
+            'php bin/console doctrine:migrations:migrate --no-interaction',
+            'php bin/phpunit',
+        ] as $postRemovalValidation) {
+            self::assertLessThan(
+                strpos($script, $postRemovalValidation),
+                $packageRemoval,
+                sprintf('Package removal must precede %s.', $postRemovalValidation),
+            );
+        }
     }
 
     public function testSmokeScriptRequiresTheTailwindEnvironmentBeforeStartingComposer(): void

@@ -9,12 +9,6 @@ framework:
     translator:
         fallbacks: ['en']
 
-services:
-    App\Locale\SupportedLocales:
-        arguments:
-            $labels: '%app.supported_locales%'
-            $defaultLocale: '%kernel.default_locale%'
-
 twig:
     globals:
         app_name: '%app.name%'

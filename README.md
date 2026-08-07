@@ -5,6 +5,7 @@
 ## Requirements
 
 - PHP 8.4 or newer
+- the PHP `ext-intl` extension
 - a fresh Symfony 8.1 skeleton or Symfony 8.1 webapp project
 - Composer 2 with Symfony Flex
 - an environment where SymfonyCasts TailwindBundle can provide Tailwind CSS 4.3.3 through its normal binary management or an application-configured binary
@@ -60,7 +61,7 @@ Review delivery, queue, retry, and sender policy in the generated `App\Mailer\Ac
 
 ## Ownership and customization
 
-After generation, edit the files under `src/`, `config/`, `templates/`, `assets/`, `translations/`, and `tests/` exactly as normal application code. Routes and services use the `App\` namespace and the generated code contains no runtime reference to this package. Keep the generated `STARTER_LICENSES.md`: it scopes the GPL-3.0-only grant for Te4g-authored copied starter resources without assigning a license to independently authored application code, and preserves the MIT/ISC notices for copied UI assets. See [customization](docs/customization.md) for the main UI and workflow extension points and [security operations](docs/security.md) before changing authentication behavior.
+After generation, edit the files under `src/`, `config/`, `templates/`, `assets/`, `translations/`, and `tests/` exactly as normal application code. This includes the generated English/French catalogues such as `translations/messages.en.xlf` and `translations/messages.fr.xlf`, the `User.locale` field, and all locale preference code. Routes and services use the `App\` namespace and the generated code contains no runtime reference to this package. Keep the generated `STARTER_LICENSES.md`: it scopes the GPL-3.0-only grant for Te4g-authored copied starter resources without assigning a license to independently authored application code, and preserves the MIT/ISC notices for copied UI assets. See [customization](docs/customization.md) for the main UI and workflow extension points and [security operations](docs/security.md) before changing authentication behavior.
 
 The companion [symfony-template integration plan](docs/superpowers/plans/2026-08-06-symfony-template-starter-integration.md) keeps the template repository thin: it invokes this starter during project creation instead of copying a second account implementation into the template.
 
