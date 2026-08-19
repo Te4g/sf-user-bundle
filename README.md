@@ -66,6 +66,14 @@ The companion [symfony-template integration plan](docs/superpowers/plans/2026-08
 
 ## Development
 
+To inspect the generated UI in a browser, run:
+
+```console
+make preview
+```
+
+The preview target requires the Symfony CLI. It replaces the ignored `var/preview/` directory with a fresh Symfony 8.1 web application, installs the development version of the starter from the current checkout, configures an SQLite database and null mail transport, applies the generated migration, and opens `http://127.0.0.1:8001` without TLS. Visit `/`, `/login`, `/register`, or `/forgot-password`; press `Ctrl+C` to stop the server. Run `make preview` again after changing generator resources so the disposable application is regenerated from the latest files. To use another port, run `PREVIEW_PORT=8010 make preview`.
+
 `make test` does not require a Tailwind binary. The maintainer smoke gate never downloads Tailwind, so provision the pinned Tailwind CSS 4.3.3 binary and pass its absolute path before running it:
 
 ```console

@@ -23,5 +23,8 @@ smoke: ## Install into fresh skeleton and webapp projects
 	@./scripts/smoke-test.sh skeleton
 	@./scripts/smoke-test.sh webapp
 
+preview: ## Rebuild and open a generated application preview
+	@./scripts/preview.sh
+
 audit: ## Audit locked Composer dependencies
 	@composer audit --locked
