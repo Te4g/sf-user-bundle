@@ -21,7 +21,6 @@
                 <twig:Field>
                     <twig:Field:Label for="{{ form.email.vars.id }}" class="{{ form.email.vars.required ? 'required' : '' }}">{{ form.email.vars.label|trans(form.email.vars.label_translation_parameters, form.email.vars.translation_domain) }}</twig:Field:Label>
                     {{ form_widget(form.email, {attr: {'aria-describedby': 'registration-email-help ' ~ form.email.vars.id ~ '_errors'}}) }}
-                    <twig:Field:Description id="registration-email-help">{{ 'registration.status'|trans }}</twig:Field:Description>
                     {{ form_errors(form.email) }}
                 </twig:Field>
                 <twig:Field data-controller="password-visibility" data-password-visibility-show-label-value="{{ 'password.show'|trans }}" data-password-visibility-hide-label-value="{{ 'password.hide'|trans }}">
@@ -32,9 +31,12 @@
                     </div>
                     {{ form_errors(form.plainPassword.first) }}
                 </twig:Field>
-                <twig:Field>
+                <twig:Field data-controller="password-visibility" data-password-visibility-show-label-value="{{ 'password.show'|trans }}" data-password-visibility-hide-label-value="{{ 'password.hide'|trans }}">
                     <twig:Field:Label for="{{ form.plainPassword.second.vars.id }}" class="{{ form.plainPassword.second.vars.required ? 'required' : '' }}">{{ form.plainPassword.second.vars.label|trans(form.plainPassword.second.vars.label_translation_parameters, form.plainPassword.second.vars.translation_domain) }}</twig:Field:Label>
-                    {{ form_widget(form.plainPassword.second, {attr: {'aria-describedby': form.plainPassword.vars.id ~ '_errors ' ~ form.plainPassword.second.vars.id ~ '_errors'}}) }}
+                    <div class="relative">
+                        {{ form_widget(form.plainPassword.second, {attr: {'aria-describedby': form.plainPassword.vars.id ~ '_errors ' ~ form.plainPassword.second.vars.id ~ '_errors', 'data-password-visibility-target': 'input', class: 'pr-28'}}) }}
+                        <twig:Button type="button" variant="ghost" size="sm" class="absolute right-1 top-1" aria-pressed="false" data-password-visibility-target="button" data-action="click->password-visibility#toggle"><twig:ux:icon name="lucide:eye" /><span data-password-visibility-target="label">{{ 'password.show'|trans }}</span></twig:Button>
+                    </div>
                     {{ form_errors(form.plainPassword) }}{{ form_errors(form.plainPassword.second) }}
                 </twig:Field>
                 {{ form_rest(form) }}

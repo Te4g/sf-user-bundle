@@ -214,6 +214,31 @@ final class UserInterfaceResourcesTest extends TestCase
         self::assertStringContainsString("path('app_forgot_password_request')", $this->resource('templates/security/login.html.twig'));
     }
 
+    public function testFieldSeparatorDoesNotOverlapAdjacentFormFields(): void
+    {
+        $separator = $this->resource('templates/components/Field/Separator.html.twig');
+
+        self::assertStringNotContainsString('-my-2', $separator);
+    }
+
+    public function testPasswordConfirmationFieldsHaveIndependentVisibilityControls(): void
+    {
+        foreach ([
+            'templates/registration/register.html.twig',
+            'templates/password/reset.html.twig',
+            'templates/account/password.html.twig',
+        ] as $path) {
+            $template = $this->resource($path);
+
+            self::assertSame(2, substr_count($template, 'data-controller="password-visibility"'), $path);
+            self::assertMatchesRegularExpression(
+                "/form_widget\\(form\\.plainPassword\\.second,.*'data-password-visibility-target': 'input'/s",
+                $template,
+                $path,
+            );
+        }
+    }
+
     public function testAlertDialogClosesBeforeNativeFormSubmission(): void
     {
         $test = dirname(__DIR__).'/Fixtures/alert-dialog-controller.test.mjs';
