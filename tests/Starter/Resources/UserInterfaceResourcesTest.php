@@ -247,6 +247,36 @@ final class UserInterfaceResourcesTest extends TestCase
         self::assertStringNotContainsString('fetch(', $sidebar);
     }
 
+    public function testAuthenticatedPagesShareAnAlignedOuterContainer(): void
+    {
+        foreach ([
+            'templates/dashboard/index.html.twig',
+            'templates/account/index.html.twig',
+            'templates/account/profile.html.twig',
+            'templates/account/password.html.twig',
+            'templates/account/delete.html.twig',
+        ] as $path) {
+            self::assertMatchesRegularExpression(
+                '/<main class="[^"]*max-w-6xl[^"]*px-4[^"]*py-10[^"]*sm:px-6[^"]*lg:px-8[^"]*">/',
+                $this->resource($path),
+                $path,
+            );
+        }
+
+        self::assertStringContainsString(
+            '<div class="max-w-3xl space-y-10">',
+            $this->resource('templates/account/index.html.twig'),
+        );
+
+        foreach (['profile', 'password', 'delete'] as $page) {
+            self::assertStringContainsString(
+                '<div class="max-w-2xl">',
+                $this->resource('templates/account/'.$page.'.html.twig'),
+                $page,
+            );
+        }
+    }
+
     public function testPasswordConfirmationFieldsHaveIndependentVisibilityControls(): void
     {
         foreach ([

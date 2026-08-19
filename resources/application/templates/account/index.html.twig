@@ -3,7 +3,8 @@
 {% block title %}Account settings · Application{% endblock %}
 
 {% block main %}
-<main class="mx-auto w-full max-w-3xl space-y-10 px-4 py-10 sm:px-6">
+<main class="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
+<div class="max-w-3xl space-y-10">
     <header class="space-y-2">
         <h1 class="text-3xl font-semibold tracking-tight">Account settings</h1>
         <p class="text-sm leading-6 text-muted-foreground">Manage your identity, sign-in details, and account access.</p>
@@ -43,5 +44,6 @@
             <twig:Button as="a" href="{{ path('app_account_delete') }}" variant="destructive">Delete account</twig:Button>
         </div>
     </nav>
+</div>
 </main>
 {% endblock %}
