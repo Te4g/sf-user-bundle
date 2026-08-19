@@ -39,6 +39,7 @@ final class UserInterfaceResourcesTest extends TestCase
             'templates/layout/public.html.twig',
             'templates/layout/auth.html.twig',
             'templates/layout/app.html.twig',
+            'templates/components/AppSidebar.html.twig',
             'templates/home/index.html.twig',
             'templates/dashboard/index.html.twig',
         ] as $path) {
@@ -48,6 +49,7 @@ final class UserInterfaceResourcesTest extends TestCase
         self::assertSame([
             'assets/controllers/alert_dialog_controller.js',
             'assets/controllers/password_visibility_controller.js',
+            'assets/controllers/sidebar_controller.js',
         ], $this->customControllerPaths($files));
     }
 
@@ -117,6 +119,7 @@ final class UserInterfaceResourcesTest extends TestCase
         self::assertStringContainsString("import '@hotwired/turbo';", $app);
         self::assertStringContainsString("register('password-visibility'", $app);
         self::assertStringContainsString("register('alert-dialog'", $app);
+        self::assertStringContainsString("register('sidebar'", $app);
 
         $twig = Yaml::parseFile($this->applicationResources().'/config/packages/account_twig.yaml');
         self::assertSame(['form/account_theme.html.twig'], $twig['twig']['form_themes']);
@@ -221,6 +224,29 @@ final class UserInterfaceResourcesTest extends TestCase
         self::assertStringNotContainsString('-my-2', $separator);
     }
 
+    public function testAuthenticatedLayoutUsesAResponsiveApplicationSidebar(): void
+    {
+        $layout = $this->resource('templates/layout/app.html.twig');
+        $sidebar = $this->resource('templates/components/AppSidebar.html.twig');
+
+        self::assertStringContainsString('data-controller="sidebar"', $layout);
+        self::assertStringContainsString('keydown.esc@window->sidebar#closeMobile', $layout);
+        self::assertStringContainsString('turbo:before-cache@document->sidebar#beforeCache', $layout);
+        self::assertStringContainsString('data-sidebar-target="desktopPanel"', $layout);
+        self::assertStringContainsString('data-sidebar-target="mobilePanel"', $layout);
+        self::assertStringContainsString('data-sidebar-target="mobileBackdrop"', $layout);
+        self::assertStringContainsString('aria-controls="app-mobile-drawer"', $layout);
+        self::assertSame(2, substr_count($layout, '<twig:AppSidebar'));
+
+        foreach (['app_dashboard', 'app_account', 'app_logout'] as $route) {
+            self::assertStringContainsString("path('".$route."')", $sidebar, $route);
+        }
+        self::assertStringContainsString("csrf_token('logout')", $sidebar);
+        self::assertStringContainsString('aria-current', $sidebar);
+        self::assertStringContainsString('data-sidebar-autofocus', $sidebar);
+        self::assertStringNotContainsString('fetch(', $sidebar);
+    }
+
     public function testPasswordConfirmationFieldsHaveIndependentVisibilityControls(): void
     {
         foreach ([
@@ -243,6 +269,16 @@ final class UserInterfaceResourcesTest extends TestCase
     {
         $test = dirname(__DIR__).'/Fixtures/alert-dialog-controller.test.mjs';
         $controller = $this->applicationResources().'/assets/controllers/alert_dialog_controller.js';
+        $process = new Process(['node', $test, $controller]);
+        $process->run();
+
+        self::assertTrue($process->isSuccessful(), $process->getErrorOutput().$process->getOutput());
+    }
+
+    public function testSidebarControllerManagesMobileFocusAndDesktopPersistence(): void
+    {
+        $test = dirname(__DIR__).'/Fixtures/sidebar-controller.test.mjs';
+        $controller = $this->applicationResources().'/assets/controllers/sidebar_controller.js';
         $process = new Process(['node', $test, $controller]);
         $process->run();
 
@@ -287,6 +323,12 @@ final class UserInterfaceResourcesTest extends TestCase
         self::assertStringContainsString("static targets = ['trigger', 'dialog', 'form']", $dialog);
         self::assertStringContainsString('requestSubmit()', $dialog);
         self::assertStringContainsString('disconnect()', $dialog);
+
+        $sidebar = $this->resource('assets/controllers/sidebar_controller.js');
+        self::assertStringContainsString("static targets = ['mobilePanel', 'mobileBackdrop', 'mobileTrigger', 'desktopPanel', 'desktopTrigger']", $sidebar);
+        self::assertStringContainsString('localStorage.getItem', $sidebar);
+        self::assertStringContainsString('localStorage.setItem', $sidebar);
+        self::assertStringContainsString('disconnect()', $sidebar);
     }
 
     /** @param array<string, string> $files

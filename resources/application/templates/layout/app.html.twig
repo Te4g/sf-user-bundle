@@ -1,18 +1,68 @@
 {% extends 'base.html.twig' %}
 
 {% block body %}
-    <header class="border-b border-border/80 bg-background/95">
-        <div class="mx-auto flex min-h-16 w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
-            <a href="{{ path('app_dashboard') }}" class="rounded-md text-base font-semibold tracking-tight outline-none focus-visible:ring-3 focus-visible:ring-ring/50">Application</a>
-            <nav aria-label="Account navigation" class="flex flex-wrap items-center gap-1 text-sm">
-                <a href="{{ path('app_dashboard') }}" class="rounded-md px-3 py-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50">Dashboard</a>
-                <a href="{{ path('app_account') }}" class="rounded-md px-3 py-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50">Account</a>
-                <form method="post" action="{{ path('app_logout') }}">
-                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('logout') }}">
-                    <twig:Button type="submit" variant="ghost">Sign out</twig:Button>
-                </form>
-            </nav>
+    <div
+        class="flex min-h-screen w-full bg-background"
+        data-controller="sidebar"
+        data-sidebar-storage-key-value="account-sidebar-collapsed"
+        data-action="keydown.esc@window->sidebar#closeMobile turbo:before-cache@document->sidebar#beforeCache"
+    >
+        <twig:AppSidebar
+            id="app-desktop-sidebar"
+            data-sidebar-target="desktopPanel"
+            data-collapsed="false"
+        />
+
+        <button
+            type="button"
+            class="fixed inset-0 z-40 hidden bg-foreground/40 backdrop-blur-[1px] lg:hidden"
+            data-sidebar-target="mobileBackdrop"
+            data-action="click->sidebar#closeMobile"
+            aria-label="Close navigation"
+        ></button>
+        <twig:AppSidebar
+            mobile
+            id="app-mobile-drawer"
+            data-sidebar-target="mobilePanel"
+        />
+
+        <div class="flex min-h-screen min-w-0 flex-1 flex-col">
+            <header class="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background/95 px-4 backdrop-blur sm:px-6">
+                <button
+                    type="button"
+                    class="grid size-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 lg:hidden"
+                    data-sidebar-target="mobileTrigger"
+                    data-action="click->sidebar#openMobile"
+                    aria-controls="app-mobile-drawer"
+                    aria-expanded="false"
+                    aria-label="Open navigation"
+                >
+                    <span aria-hidden="true" class="grid size-5 grid-rows-3 gap-1 py-0.5">
+                        <span class="h-0.5 rounded-full bg-current"></span>
+                        <span class="h-0.5 rounded-full bg-current"></span>
+                        <span class="h-0.5 rounded-full bg-current"></span>
+                    </span>
+                </button>
+                <button
+                    type="button"
+                    class="hidden size-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 lg:grid"
+                    data-sidebar-target="desktopTrigger"
+                    data-action="click->sidebar#toggleDesktop"
+                    aria-controls="app-desktop-sidebar"
+                    aria-expanded="true"
+                    aria-label="Toggle navigation"
+                    title="Toggle navigation"
+                >
+                    <span aria-hidden="true" class="grid size-5 grid-cols-[0.35rem_1fr] overflow-hidden rounded border border-current">
+                        <span class="border-r border-current bg-current/15"></span>
+                        <span></span>
+                    </span>
+                </button>
+                <span class="h-4 w-px bg-border" aria-hidden="true"></span>
+                <span class="text-sm font-medium">{{ app.request.attributes.get('_route') starts with 'app_account' ? 'Account' : 'Dashboard' }}</span>
+            </header>
+
+            {% block main %}{% endblock %}
         </div>
-    </header>
-    {% block main %}{% endblock %}
+    </div>
 {% endblock %}

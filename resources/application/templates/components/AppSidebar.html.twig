@@ -1,0 +1,82 @@
+{# @prop mobile Whether to render the off-canvas mobile drawer. #}
+{%- props mobile = false -%}
+{%- set current_route = app.request.attributes.get('_route') -%}
+{%- set dashboard_active = current_route == 'app_dashboard' -%}
+{%- set account_active = current_route starts with 'app_account' -%}
+{%- set base_class = 'group/sidebar flex flex-col border-r border-border bg-card text-card-foreground' -%}
+{%- set panel_class = mobile
+    ? 'fixed inset-y-0 left-0 z-50 w-72 -translate-x-full shadow-xl transition-transform duration-200 ease-out lg:hidden'
+    : 'sticky top-0 hidden h-screen w-64 shrink-0 transition-[width] duration-200 ease-out lg:flex data-[collapsed=true]:w-20'
+-%}
+
+<aside
+    class="{{ (base_class ~ ' ' ~ panel_class ~ ' ' ~ attributes.render('class'))|tailwind_merge }}"
+    {% if mobile %}role="dialog" aria-modal="true" aria-label="Application navigation" aria-hidden="true" inert{% endif %}
+    {{ attributes.without('class') }}
+>
+    <div class="flex h-16 shrink-0 items-center gap-3 border-b border-border px-4 group-data-[collapsed=true]/sidebar:justify-center group-data-[collapsed=true]/sidebar:px-2">
+        <a
+            href="{{ path('app_dashboard') }}"
+            class="flex min-w-0 items-center gap-3 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            {% if mobile %}data-action="click->sidebar#closeMobile"{% endif %}
+        >
+            <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground">A</span>
+            <span class="truncate text-sm font-semibold tracking-tight group-data-[collapsed=true]/sidebar:sr-only">Application</span>
+        </a>
+        {% if mobile %}
+            <button
+                type="button"
+                class="ml-auto grid size-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                data-action="click->sidebar#closeMobile"
+                aria-label="Close navigation"
+            >
+                <span aria-hidden="true" class="text-xl leading-none">×</span>
+            </button>
+        {% endif %}
+    </div>
+
+    <nav aria-label="Application navigation" class="flex-1 space-y-1 overflow-y-auto p-3 group-data-[collapsed=true]/sidebar:px-2">
+        <p class="px-3 pb-2 pt-1 text-xs font-medium uppercase tracking-wider text-muted-foreground group-data-[collapsed=true]/sidebar:sr-only">Platform</p>
+        <a
+            href="{{ path('app_dashboard') }}"
+            class="flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 group-data-[collapsed=true]/sidebar:justify-center group-data-[collapsed=true]/sidebar:px-2 {{ dashboard_active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground' }}"
+            {% if dashboard_active %}aria-current="page"{% endif %}
+            {% if mobile %}data-action="click->sidebar#closeMobile" data-sidebar-autofocus{% endif %}
+            title="Dashboard"
+        >
+            <twig:ux:icon name="lucide:circle-check" class="size-4 shrink-0" />
+            <span class="truncate group-data-[collapsed=true]/sidebar:sr-only">Dashboard</span>
+        </a>
+        <a
+            href="{{ path('app_account') }}"
+            class="flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 group-data-[collapsed=true]/sidebar:justify-center group-data-[collapsed=true]/sidebar:px-2 {{ account_active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground' }}"
+            {% if account_active %}aria-current="page"{% endif %}
+            {% if mobile %}data-action="click->sidebar#closeMobile"{% endif %}
+            title="Account"
+        >
+            <twig:ux:icon name="lucide:key-round" class="size-4 shrink-0" />
+            <span class="truncate group-data-[collapsed=true]/sidebar:sr-only">Account</span>
+        </a>
+    </nav>
+
+    <div class="border-t border-border p-3 group-data-[collapsed=true]/sidebar:px-2">
+        <div class="mb-2 flex min-w-0 items-center gap-3 rounded-lg px-3 py-2 group-data-[collapsed=true]/sidebar:justify-center group-data-[collapsed=true]/sidebar:px-2">
+            <span class="grid size-8 shrink-0 place-items-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">{{ app.user.name|first|upper }}</span>
+            <span class="min-w-0 group-data-[collapsed=true]/sidebar:sr-only">
+                <span class="block truncate text-sm font-medium">{{ app.user.name }}</span>
+                <span class="block truncate text-xs text-muted-foreground">{{ app.user.userIdentifier }}</span>
+            </span>
+        </div>
+        <form method="post" action="{{ path('app_logout') }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('logout') }}">
+            <button
+                type="submit"
+                class="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 group-data-[collapsed=true]/sidebar:justify-center group-data-[collapsed=true]/sidebar:px-2"
+                title="Sign out"
+            >
+                <span aria-hidden="true" class="grid size-4 shrink-0 place-items-center text-base leading-none">↪</span>
+                <span class="group-data-[collapsed=true]/sidebar:sr-only">Sign out</span>
+            </button>
+        </form>
+    </div>
+</aside>
