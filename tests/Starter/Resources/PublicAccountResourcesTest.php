@@ -121,6 +121,27 @@ final class PublicAccountResourcesTest extends TestCase
         self::assertStringContainsString("'data_class' => ResetPasswordInput::class", $resetType);
     }
 
+    public function testNewPasswordsRequireEightCharactersWithAnActionableError(): void
+    {
+        foreach (['RegistrationInput.php', 'ResetPasswordInput.php', 'PasswordChangeInput.php'] as $file) {
+            $model = $this->resource('src/Form/Model/'.$file);
+
+            self::assertStringContainsString(
+                "#[Assert\\Length(min: 8, minMessage: 'password.too_short')]",
+                $model,
+                $file,
+            );
+            self::assertStringNotContainsString('PasswordStrength', $model, $file);
+        }
+
+        $validators = $this->resource('translations/validators.en.xlf');
+        self::assertStringContainsString('<source>password.too_short</source>', $validators);
+        self::assertStringContainsString(
+            '<target>Your password must be at least {{ limit }} characters long.</target>',
+            $validators,
+        );
+    }
+
     public function testMailerUsesEditableApplicationDefaultsAndApplicationTemplates(): void
     {
         $source = $this->resource('src/Mailer/AccountMailer.php');

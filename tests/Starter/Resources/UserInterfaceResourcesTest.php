@@ -329,9 +329,10 @@ final class UserInterfaceResourcesTest extends TestCase
             }
         }
 
-        $translation = $this->applicationResources().'/translations/messages.en.xlf';
-        $document = new \DOMDocument();
-        self::assertTrue($document->load($translation, LIBXML_NONET));
+        foreach (glob($this->applicationResources().'/translations/*.xlf') ?: [] as $translation) {
+            $document = new \DOMDocument();
+            self::assertTrue($document->load($translation, LIBXML_NONET), $translation);
+        }
 
         foreach ($this->customControllerPaths($files) as $path) {
             $source = $this->contents($files[$path]);

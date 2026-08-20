@@ -7,8 +7,6 @@ namespace Te4g\Starter\Tests\Resources;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 use Symfony\Component\Process\Process;
-use Symfony\Component\Validator\Constraints\PasswordStrength;
-use Symfony\Component\Validator\Constraints\PasswordStrengthValidator;
 use Symfony\Component\Yaml\Yaml;
 use Te4g\Starter\Generation\ResourceCatalog;
 
@@ -91,7 +89,7 @@ final class GeneratedTestsResourcesTest extends TestCase
         );
     }
 
-    public function testGeneratedSuccessAndExpiryPasswordsMeetTheInstalledMediumStrengthConstraint(): void
+    public function testGeneratedSuccessAndExpiryFlowsUseConsistentPasswordFixtures(): void
     {
         $settings = $this->methodSource(
             $this->resource('tests/Functional/AccountSettingsTest.php'),
@@ -103,10 +101,6 @@ final class GeneratedTestsResourcesTest extends TestCase
         );
         $strongPassword = 'Correct Horse Battery Staple 42!';
 
-        self::assertGreaterThanOrEqual(
-            PasswordStrength::STRENGTH_MEDIUM,
-            PasswordStrengthValidator::estimateStrength($strongPassword),
-        );
         self::assertSame(5, substr_count($settings, "'".$strongPassword."'"));
         self::assertSame(2, substr_count($expiredReset, "'".$strongPassword."'"));
         self::assertStringNotContainsString("'new-password'", $settings);
@@ -297,10 +291,6 @@ final class GeneratedTestsResourcesTest extends TestCase
             'testEveryStateChangingFormRejectsAnInvalidCsrfToken',
         );
         $otherwiseValidPassword = 'Correct Horse Battery Staple 42!';
-        self::assertGreaterThanOrEqual(
-            PasswordStrength::STRENGTH_MEDIUM,
-            PasswordStrengthValidator::estimateStrength($otherwiseValidPassword),
-        );
         foreach ([
             "\$otherwiseValidPassword = '".$otherwiseValidPassword."'",
             'registration-control@example.com',

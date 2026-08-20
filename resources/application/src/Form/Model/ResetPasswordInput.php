@@ -8,7 +8,6 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 final class ResetPasswordInput
 {
-    #[Assert\NotBlank]
-    #[Assert\PasswordStrength(minScore: Assert\PasswordStrength::STRENGTH_MEDIUM)]
+    #[Assert\Length(min: 8, minMessage: 'password.too_short')]
     public string $plainPassword = '';
 }
