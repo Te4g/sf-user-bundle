@@ -1,7 +1,7 @@
 {% extends 'layout/auth.html.twig' %}
 {% block title %}{{ 'check_email.title'|trans }}{% endblock %}
 {% block main %}
-<main class="mx-auto flex min-h-[calc(100svh-4rem)] w-full max-w-md items-center px-4 py-10"><twig:Card class="w-full shadow-sm">
+<main class="mx-auto flex min-h-[calc(100svh-4rem)] w-full max-w-6xl items-center px-4 py-10 sm:px-6 lg:px-8"><div class="mx-auto w-full max-w-md"><twig:Card class="w-full shadow-sm">
 <twig:Card:Header><twig:Card:Title><h1 class="text-xl">{{ 'check_email.title'|trans }}</h1></twig:Card:Title><twig:Card:Description>{{ 'check_email.status'|trans }}</twig:Card:Description></twig:Card:Header>
 <twig:Card:Content class="space-y-5"><div aria-live="polite"><twig:Alert><twig:ux:icon name="lucide:circle-check" /><twig:Alert:Description>{{ 'check_email.status'|trans }}</twig:Alert:Description></twig:Alert></div>
 {% if resend_form is defined %}
@@ -11,5 +11,5 @@
 {% else %}
 <twig:Button as="a" href="{{ path('app_login') }}" variant="outline" class="w-full">Return to sign in</twig:Button>
 {% endif %}
-</twig:Card:Content></twig:Card></main>
+</twig:Card:Content></twig:Card></div></main>
 {% endblock %}

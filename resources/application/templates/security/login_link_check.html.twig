@@ -1,12 +1,13 @@
 {% extends 'layout/auth.html.twig' %}
 {% block title %}{{ 'login_link.title'|trans }}{% endblock %}
 {% block main %}
-<main class="mx-auto flex min-h-[calc(100svh-4rem)] w-full max-w-md items-center px-4 py-10">
+<main class="mx-auto flex min-h-[calc(100svh-4rem)] w-full max-w-6xl items-center px-4 py-10 sm:px-6 lg:px-8">
+<div class="mx-auto w-full max-w-md">
 <twig:Card class="w-full shadow-sm"><twig:Card:Header><twig:Card:Title><h1 class="text-xl">{{ 'login_link.title'|trans }}</h1></twig:Card:Title><twig:Card:Description>{{ 'login_link.status'|trans }}</twig:Card:Description></twig:Card:Header><twig:Card:Content>
 <div class="sr-only" aria-live="polite">{{ 'login_link.status'|trans }}</div>
 <form method="post" action="{{ path('app_login_link_check') }}" class="space-y-4">
 {% for name, value in login_link_parameters %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
 <input type="hidden" name="_csrf_token" value="{{ csrf_token('app_login_link_check') }}">
 <twig:Button type="submit" class="w-full" data-turbo-submits-with="{{ 'form.submitting'|trans }}"><twig:ux:icon name="lucide:key-round" />{{ 'login_link.submit'|trans }}</twig:Button>
-</form></twig:Card:Content></twig:Card></main>
+</form></twig:Card:Content></twig:Card></div></main>
 {% endblock %}

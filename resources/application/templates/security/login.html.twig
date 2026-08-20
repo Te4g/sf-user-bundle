@@ -1,7 +1,8 @@
 {% extends 'layout/auth.html.twig' %}
 {% block title %}{{ 'login.title'|trans }}{% endblock %}
 {% block main %}
-<main class="mx-auto flex min-h-[calc(100svh-4rem)] w-full max-w-md items-center px-4 py-10">
+<main class="mx-auto flex min-h-[calc(100svh-4rem)] w-full max-w-6xl items-center px-4 py-10 sm:px-6 lg:px-8">
+    <div class="mx-auto w-full max-w-md">
     <twig:Card>
         <twig:Card:Header><twig:Card:Title><h1 class="text-xl">{{ 'login.title'|trans }}</h1></twig:Card:Title></twig:Card:Header>
         <twig:Card:Content class="space-y-6">
@@ -39,5 +40,6 @@
             {{ form_end(magic_link_form, {render_rest: false}) }}
         </twig:Card:Content>
     </twig:Card>
+    </div>
 </main>
 {% endblock %}

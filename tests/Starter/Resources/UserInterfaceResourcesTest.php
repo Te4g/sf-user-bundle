@@ -277,6 +277,34 @@ final class UserInterfaceResourcesTest extends TestCase
         }
     }
 
+    public function testPublicAndAuthenticationPagesShareTheOuterContainerWidth(): void
+    {
+        foreach (['templates/layout/public.html.twig', 'templates/layout/auth.html.twig'] as $path) {
+            $layout = $this->resource($path);
+
+            self::assertStringContainsString('max-w-6xl', $layout, $path);
+            self::assertStringContainsString('sm:px-6 lg:px-8', $layout, $path);
+        }
+
+        foreach ([
+            'templates/security/login.html.twig',
+            'templates/security/check_email.html.twig',
+            'templates/security/login_link_check.html.twig',
+            'templates/registration/register.html.twig',
+            'templates/password/request.html.twig',
+            'templates/password/reset.html.twig',
+        ] as $path) {
+            $template = $this->resource($path);
+
+            self::assertMatchesRegularExpression(
+                '/<main class="[^"]*max-w-6xl[^"]*sm:px-6[^"]*lg:px-8[^"]*">/',
+                $template,
+                $path,
+            );
+            self::assertStringContainsString('<div class="mx-auto w-full max-w-md">', $template, $path);
+        }
+    }
+
     public function testPasswordConfirmationFieldsHaveIndependentVisibilityControls(): void
     {
         foreach ([

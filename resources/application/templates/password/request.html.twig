@@ -1,11 +1,11 @@
 {% extends 'layout/auth.html.twig' %}
 {% block title %}{{ 'password_request.title'|trans }}{% endblock %}
 {% block main %}
-<main class="mx-auto flex min-h-[calc(100svh-4rem)] w-full max-w-md items-center px-4 py-10"><twig:Card class="w-full shadow-sm">
+<main class="mx-auto flex min-h-[calc(100svh-4rem)] w-full max-w-6xl items-center px-4 py-10 sm:px-6 lg:px-8"><div class="mx-auto w-full max-w-md"><twig:Card class="w-full shadow-sm">
 <twig:Card:Header><twig:Card:Title><h1 class="text-xl">{{ 'password_request.title'|trans }}</h1></twig:Card:Title><twig:Card:Description>{{ 'password_request.status'|trans }}</twig:Card:Description></twig:Card:Header>
 <twig:Card:Content><div class="sr-only" aria-live="polite">{{ 'password_request.status'|trans }}</div>{{ form_start(form, {attr: {class: 'space-y-5'}}) }}
 {% if form.vars.submitted and not form.vars.valid %}<twig:Alert variant="destructive"><twig:ux:icon name="lucide:triangle-alert" /><twig:Alert:Title>{{ 'form.error_summary'|trans }}</twig:Alert:Title><twig:Alert:Description>{{ form_errors(form) }}</twig:Alert:Description></twig:Alert>{% endif %}
 <twig:Field><twig:Field:Label for="{{ form.email.vars.id }}" class="{{ form.email.vars.required ? 'required' : '' }}">{{ form.email.vars.label|trans(form.email.vars.label_translation_parameters, form.email.vars.translation_domain) }}</twig:Field:Label>{{ form_widget(form.email, {attr: {'aria-describedby': form.email.vars.id ~ '_errors'}}) }}{{ form_errors(form.email) }}</twig:Field>
 {{ form_rest(form) }}<twig:Button type="submit" class="w-full" data-turbo-submits-with="{{ 'form.submitting'|trans }}"><twig:ux:icon name="lucide:mail" />{{ 'password_request.submit'|trans }}</twig:Button>{{ form_end(form, {render_rest: false}) }}
-</twig:Card:Content></twig:Card></main>
+</twig:Card:Content></twig:Card></div></main>
 {% endblock %}
