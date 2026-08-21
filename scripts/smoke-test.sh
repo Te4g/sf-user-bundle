@@ -105,13 +105,13 @@ printf 'Removing the generator before any database use...\n'
     if composer show te4g/starter >/dev/null 2>&1; then
         fail 'te4g/starter remains installed after Composer removal.'
     fi
-    if rg -n 'Te4g\\|te4g/starter|te4g_user' src config templates assets tests composer.json; then
+    if grep -R -n -E 'Te4g\\|te4g/starter|te4g_user' src config templates assets tests composer.json; then
         fail 'generated application paths still reference the starter package.'
     fi
     [ -f STARTER_LICENSES.md ] || fail 'generated application lost STARTER_LICENSES.md after package removal.'
-    rg -q 'END OF TERMS AND CONDITIONS' STARTER_LICENSES.md \
+    grep -F -q 'END OF TERMS AND CONDITIONS' STARTER_LICENSES.md \
         || fail 'generated application license file does not contain the complete GPL terms.'
-    rg -q 'Lucide Icons and Contributors' STARTER_LICENSES.md \
+    grep -F -q 'Lucide Icons and Contributors' STARTER_LICENSES.md \
         || fail 'generated application license file does not contain the Lucide notice.'
 )
 
@@ -141,8 +141,8 @@ for candidate in "$APP_DIR"/migrations/Version*.php; do
     migration_file="$candidate"
 done
 [ "$migration_count" -eq 1 ] || fail "expected exactly one migration, found ${migration_count}."
-rg -q 'CREATE TABLE.*user' "$migration_file" || fail 'migration does not create the User schema.'
-rg -q 'CREATE TABLE.*reset_password_request' "$migration_file" || fail 'migration does not create the reset-request schema.'
+grep -E -q 'CREATE TABLE.*user' "$migration_file" || fail 'migration does not create the User schema.'
+grep -E -q 'CREATE TABLE.*reset_password_request' "$migration_file" || fail 'migration does not create the reset-request schema.'
 
 printf 'Applying and validating the application-owned schema...\n'
 (

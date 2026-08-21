@@ -52,6 +52,8 @@ final class SmokeScriptTest extends TestCase
         self::assertStringContainsString('STARTER_LICENSES.md', $script);
         self::assertStringContainsString('END OF TERMS AND CONDITIONS', $script);
         self::assertStringContainsString('Lucide Icons and Contributors', $script);
+        self::assertStringNotContainsString('rg ', $script);
+        self::assertStringContainsString('grep -R -n -E', $script);
         self::assertStringContainsString('make:migration', $script);
         self::assertLessThan(
             strpos($script, 'make:migration'),
