@@ -12,6 +12,12 @@ fail() {
     exit 1
 }
 
+case "$PREVIEW_PORT" in
+    ''|*[!0-9]*) fail 'PREVIEW_PORT must be an integer between 1 and 65535.' ;;
+esac
+[ "$PREVIEW_PORT" -ge 1 ] && [ "$PREVIEW_PORT" -le 65535 ] \
+    || fail 'PREVIEW_PORT must be an integer between 1 and 65535.'
+
 for required_command in composer php symfony; do
     command -v "$required_command" >/dev/null 2>&1 \
         || fail "${required_command} is required."
@@ -19,12 +25,6 @@ done
 
 php -r 'exit(extension_loaded("pdo_sqlite") ? 0 : 1);' \
     || fail 'The pdo_sqlite PHP extension is required.'
-
-case "$PREVIEW_PORT" in
-    ''|*[!0-9]*) fail 'PREVIEW_PORT must be an integer between 1 and 65535.' ;;
-esac
-[ "$PREVIEW_PORT" -ge 1 ] && [ "$PREVIEW_PORT" -le 65535 ] \
-    || fail 'PREVIEW_PORT must be an integer between 1 and 65535.'
 
 if [ -L "$PREVIEW_PARENT" ]; then
     fail "refusing to use symlinked preview parent ${PREVIEW_PARENT}."
