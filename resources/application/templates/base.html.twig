@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="light dark">
     <title>{% block title %}Application{% endblock %}</title>
+    <script src="{{ asset('theme.js') }}" data-turbo-track="reload"></script>
     <link rel="stylesheet" href="{{ asset('styles/app.css') }}" data-turbo-track="reload">
     {{ importmap('app') }}
 </head>

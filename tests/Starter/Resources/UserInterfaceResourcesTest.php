@@ -323,6 +323,47 @@ final class UserInterfaceResourcesTest extends TestCase
         }
     }
 
+    public function testThemeBehaviorFollowsTheDeviceAndPersistsExplicitChoices(): void
+    {
+        $test = dirname(__DIR__).'/Fixtures/theme.test.mjs';
+        $theme = $this->applicationResources().'/assets/theme.js';
+        $process = new Process(['node', $test, $theme]);
+        $process->run();
+
+        self::assertTrue($process->isSuccessful(), $process->getErrorOutput().$process->getOutput());
+    }
+
+    public function testEveryHeaderRendersTheIconThemeSwitcherBeforeStylesLoad(): void
+    {
+        $base = $this->resource('templates/base.html.twig');
+        $themePosition = strpos($base, "asset('theme.js')");
+        $stylePosition = strpos($base, "asset('styles/app.css')");
+
+        self::assertIsInt($themePosition);
+        self::assertIsInt($stylePosition);
+        self::assertLessThan($stylePosition, $themePosition);
+
+        foreach (['public', 'auth', 'app'] as $layout) {
+            self::assertSame(
+                1,
+                substr_count($this->resource('templates/layout/'.$layout.'.html.twig'), '<twig:ThemeSelector />'),
+                $layout,
+            );
+        }
+
+        $selector = $this->resource('templates/components/ThemeSelector.html.twig');
+        self::assertStringContainsString("themes = {system: 'System', light: 'Light', dark: 'Dark'}", $selector);
+        self::assertStringContainsString('data-theme-switcher', $selector);
+        self::assertStringContainsString('data-theme-trigger', $selector);
+        self::assertStringContainsString('data-theme-current-icon', $selector);
+        self::assertStringContainsString('data-theme-option', $selector);
+        self::assertStringContainsString('group-data-[open=true]/theme:visible', $selector);
+        self::assertStringContainsString('aria-expanded="false"', $selector);
+        self::assertStringContainsString('role="group" aria-label="Choose theme"', $selector);
+        self::assertStringNotContainsString('<select', $selector);
+        self::assertSame(3, substr_count($selector, '<svg'));
+    }
+
     public function testAlertDialogClosesBeforeNativeFormSubmission(): void
     {
         $test = dirname(__DIR__).'/Fixtures/alert-dialog-controller.test.mjs';
