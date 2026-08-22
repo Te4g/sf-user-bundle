@@ -10,14 +10,14 @@ fail() {
 }
 
 usage() {
-    printf 'Usage: %s skeleton|webapp\n' "$0" >&2
+    printf 'Usage: %s skeleton|skeleton-twig|webapp\n' "$0" >&2
     exit 64
 }
 
 [ "$#" -eq 1 ] || usage
 readonly VARIANT="$1"
 case "$VARIANT" in
-    skeleton|webapp) ;;
+    skeleton|skeleton-twig|webapp) ;;
     *) usage ;;
 esac
 
@@ -57,12 +57,26 @@ export TE4G_TAILWIND_BINARY="$validated_tailwind"
 
 printf 'Creating a fresh Symfony 8.1 %s application...\n' "$VARIANT"
 composer create-project 'symfony/skeleton:8.1.*' "$APP_DIR" --no-interaction --no-progress
-if [ "$VARIANT" = 'webapp' ]; then
-    (
-        cd -- "$APP_DIR"
-        composer require webapp --no-interaction --no-progress
-    )
-fi
+case "$VARIANT" in
+    skeleton-twig)
+        (
+            cd -- "$APP_DIR"
+            composer require 'symfony/twig-bundle:^8.1' --no-interaction --no-progress
+            if composer show symfony/asset-mapper >/dev/null 2>&1; then
+                fail 'the skeleton-twig fixture unexpectedly installed AssetMapper.'
+            fi
+            if grep -F -q "importmap('app')" templates/base.html.twig; then
+                fail 'the skeleton-twig fixture unexpectedly contains the AssetMapper baseline.'
+            fi
+        )
+        ;;
+    webapp)
+        (
+            cd -- "$APP_DIR"
+            composer require webapp --no-interaction --no-progress
+        )
+        ;;
+esac
 
 export APP_ENV=dev
 export DATABASE_URL='postgresql://user:password@127.0.0.1:1/unreachable?serverVersion=17'

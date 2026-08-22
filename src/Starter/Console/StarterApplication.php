@@ -25,7 +25,10 @@ final class StarterApplication
         $installer = new StarterInstaller(
             new ProjectInspector(PHP_VERSION, Kernel::VERSION),
             new ResourceCatalog($packageRoot.'/resources/application'),
-            new ReplacementPolicy($packageRoot.'/resources/baselines/webapp'),
+            new ReplacementPolicy([
+                $packageRoot.'/resources/baselines/webapp',
+                $packageRoot.'/resources/baselines/twig-only',
+            ]),
             new RuntimeDependencyInstaller(new ProcessComposerRunner()),
             $processRunner,
             new StagedFileWriter(),

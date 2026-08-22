@@ -19,8 +19,9 @@ stan: ## Run PHPStan
 phpunit: ## Run PHPUnit
 	@php -d memory_limit=512M vendor/bin/phpunit --configuration phpunit.xml.dist
 
-smoke: ## Install into fresh skeleton and webapp projects
+smoke: ## Install into bare skeleton, Twig-only skeleton, and webapp projects
 	@./scripts/smoke-test.sh skeleton
+	@./scripts/smoke-test.sh skeleton-twig
 	@./scripts/smoke-test.sh webapp
 
 preview: ## Rebuild and open a generated application preview

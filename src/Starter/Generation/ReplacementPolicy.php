@@ -9,8 +9,13 @@ use Te4g\Starter\Project\ProjectLayout;
 
 final readonly class ReplacementPolicy
 {
-    public function __construct(private string $baselineRoot)
+    /** @var list<string> */
+    private array $baselineRoots;
+
+    /** @param string|list<string> $baselineRoots */
+    public function __construct(string|array $baselineRoots)
     {
+        $this->baselineRoots = is_string($baselineRoots) ? [$baselineRoots] : $baselineRoots;
     }
 
     /** @param array<string, string> $resources */
@@ -52,9 +57,8 @@ final readonly class ReplacementPolicy
                 continue;
             }
 
-            $baseline = $this->baselineContents($relativePath);
             $existing = file_get_contents($target);
-            if (null === $baseline || false === $existing || $existing !== $baseline) {
+            if (false === $existing || !$this->matchesBaseline($relativePath, $existing)) {
                 $conflicts[] = new Conflict($relativePath, 'existing content is not a supported fresh Symfony baseline');
 
                 continue;
@@ -66,15 +70,20 @@ final readonly class ReplacementPolicy
         return new GenerationPlan($writes, $conflicts);
     }
 
-    private function baselineContents(string $relativePath): ?string
+    private function matchesBaseline(string $relativePath, string $existing): bool
     {
-        $baseline = rtrim($this->baselineRoot, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
-        if (is_link($baseline) || !is_file($baseline) || !is_readable($baseline)) {
-            return null;
+        foreach ($this->baselineRoots as $baselineRoot) {
+            $baseline = rtrim($baselineRoot, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
+            if (is_link($baseline) || !is_file($baseline) || !is_readable($baseline)) {
+                continue;
+            }
+
+            $contents = file_get_contents($baseline);
+            if (false !== $contents && $existing === $contents) {
+                return true;
+            }
         }
 
-        $contents = file_get_contents($baseline);
-
-        return false === $contents ? null : $contents;
+        return false;
     }
 }

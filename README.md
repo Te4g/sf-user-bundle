@@ -81,6 +81,6 @@ export TE4G_TAILWIND_BINARY=/absolute/path/to/tailwindcss
 make smoke
 ```
 
-`make test` runs code style, PHPStan, and the complete starter suite with a 512 MB PHPUnit limit. `make smoke` creates real fresh Symfony 8.1 skeleton and webapp projects, proves installation does not access PostgreSQL, removes `te4g/starter`, then builds, migrates, boots, and tests each independently owned application. `make audit` audits the locked development dependencies.
+`make test` runs code style, PHPStan, and the complete starter suite with a 512 MB PHPUnit limit. `make smoke` creates real fresh Symfony 8.1 bare skeleton, Twig-enabled skeleton, and webapp projects, proves installation does not access PostgreSQL, removes `te4g/starter`, then builds, migrates, boots, and tests each independently owned application. The Twig-enabled skeleton specifically verifies installation before AssetMapper has added its import-map block. `make audit` audits the locked development dependencies.
 
 The vendored UI provenance and hashes are recorded in `resources/shadcn/manifest.json` and `THIRD_PARTY_NOTICES.md`. `symfony/ux-toolkit` is a development-only dependency used by `tools/ShadcnSnapshotSynchronizer.php`; it is never required by the generated application at runtime.

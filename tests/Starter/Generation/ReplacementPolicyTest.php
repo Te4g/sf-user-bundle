@@ -47,6 +47,41 @@ final class ReplacementPolicyTest extends TestCase
         self::assertTrue($plan->writes()[0]->isReplacement());
     }
 
+    public function testRecognizedFreshWebappTemplateBaselineIsReplaceable(): void
+    {
+        $plan = $this->planForTemplateBaseline('webapp');
+
+        self::assertSame([], $plan->conflicts());
+        self::assertTrue($plan->writes()[0]->isReplacement());
+    }
+
+    public function testRecognizedFreshTwigOnlyTemplateBaselineIsReplaceable(): void
+    {
+        $plan = $this->planForTemplateBaseline('twig-only');
+
+        self::assertSame([], $plan->conflicts());
+        self::assertTrue($plan->writes()[0]->isReplacement());
+    }
+
+    public function testCustomizedTwigOnlyTemplateIsAnExactConflict(): void
+    {
+        $layout = $this->layout();
+        $path = $layout->path('templates/base.html.twig');
+        self::assertTrue(mkdir(dirname($path), 0700, true));
+        $contents = file_get_contents($this->baseline('templates/base.html.twig', 'twig-only'));
+        self::assertIsString($contents);
+        self::assertNotFalse(file_put_contents($path, $contents."{# customized #}\n"));
+
+        $plan = $this->policy()->plan($layout, [
+            'templates/base.html.twig' => $this->generatedTemplatePath(),
+        ]);
+
+        self::assertSame(
+            'templates/base.html.twig: existing content is not a supported fresh Symfony baseline',
+            $plan->conflicts()[0]->message(),
+        );
+    }
+
     public function testRecognizedFreshResetPasswordRecipeBaselineIsReplaceable(): void
     {
         $layout = $this->layout();
@@ -101,7 +136,10 @@ YAML."\n"));
 
     private function policy(): ReplacementPolicy
     {
-        return new ReplacementPolicy(dirname(__DIR__, 3).'/resources/baselines/webapp');
+        return new ReplacementPolicy([
+            dirname(__DIR__, 3).'/resources/baselines/webapp',
+            dirname(__DIR__, 3).'/resources/baselines/twig-only',
+        ]);
     }
 
     private function generatedSecurityPath(): string
@@ -114,9 +152,26 @@ YAML."\n"));
         return dirname(__DIR__, 2).'/Fixtures/Starter/resource-tree/src/Entity/User.php';
     }
 
-    private function baseline(string $path): string
+    private function generatedTemplatePath(): string
     {
-        return dirname(__DIR__, 3).'/resources/baselines/webapp/'.$path;
+        return dirname(__DIR__, 3).'/resources/application/templates/base.html.twig';
+    }
+
+    private function baseline(string $path, string $variant = 'webapp'): string
+    {
+        return dirname(__DIR__, 3).'/resources/baselines/'.$variant.'/'.$path;
+    }
+
+    private function planForTemplateBaseline(string $variant): \Te4g\Starter\Generation\GenerationPlan
+    {
+        $layout = $this->layout();
+        $path = $layout->path('templates/base.html.twig');
+        self::assertTrue(mkdir(dirname($path), 0700, true));
+        self::assertNotFalse(copy($this->baseline('templates/base.html.twig', $variant), $path));
+
+        return $this->policy()->plan($layout, [
+            'templates/base.html.twig' => $this->generatedTemplatePath(),
+        ]);
     }
 
     private function layout(): ProjectLayout

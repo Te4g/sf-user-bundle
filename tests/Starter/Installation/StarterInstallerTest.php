@@ -127,6 +127,48 @@ final class StarterInstallerTest extends TestCase
         self::assertGreaterThan(0.0, $processRunner->calls[0]['timeout']);
     }
 
+    public function testTwigOnlyPreflightReachesDependenciesAndAcceptsAssetMapperOutput(): void
+    {
+        self::assertTrue(mkdir($this->projectDirectory.'/resources/templates'));
+        self::assertTrue(mkdir($this->projectDirectory.'/baselines/templates'));
+        self::assertTrue(mkdir($this->projectDirectory.'/alternative-baselines/templates', 0700, true));
+        self::assertTrue(mkdir($this->projectDirectory.'/templates'));
+        self::assertNotFalse(file_put_contents(
+            $this->projectDirectory.'/resources/templates/base.html.twig',
+            'generated application',
+        ));
+        self::assertNotFalse(file_put_contents(
+            $this->projectDirectory.'/baselines/templates/base.html.twig',
+            'fresh with importmap',
+        ));
+        self::assertNotFalse(file_put_contents(
+            $this->projectDirectory.'/alternative-baselines/templates/base.html.twig',
+            'fresh without importmap',
+        ));
+        self::assertNotFalse(file_put_contents($this->projectDirectory.'/templates/base.html.twig', 'fresh without importmap'));
+        $composerRunner = new class ($this->projectDirectory) implements ComposerRunnerInterface {
+            private int $calls = 0;
+
+            public function __construct(private readonly string $projectDirectory)
+            {
+            }
+
+            public function run(array $arguments, string $cwd): ProcessResult
+            {
+                if (0 === $this->calls++) {
+                    file_put_contents($this->projectDirectory.'/templates/base.html.twig', 'fresh with importmap');
+                }
+
+                return new ProcessResult(['composer', ...$arguments], 0, '', '');
+            }
+        };
+
+        $this->installerWith($composerRunner, new RecordingProcessRunner())->install($this->layout(), static function (): void {
+        });
+
+        self::assertSame('generated application', file_get_contents($this->projectDirectory.'/templates/base.html.twig'));
+    }
+
     private function installer(OperationTrace $trace): StarterInstaller
     {
         $processRunner = new RecordingProcessRunner();
@@ -144,7 +186,10 @@ final class StarterInstallerTest extends TestCase
         return new StarterInstaller(
             new \Te4g\Starter\Project\ProjectInspector('8.4.0', '8.1.0'),
             new ResourceCatalog($this->projectDirectory.'/resources'),
-            new ReplacementPolicy($this->projectDirectory.'/baselines'),
+            new ReplacementPolicy([
+                $this->projectDirectory.'/baselines',
+                $this->projectDirectory.'/alternative-baselines',
+            ]),
             new RuntimeDependencyInstaller($composerRunner),
             $processRunner,
             new StagedFileWriter(),
