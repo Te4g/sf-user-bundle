@@ -8,7 +8,7 @@ The starter copies final application code rather than installing extension point
 - Keep email normalization centralized in `src/Account/EmailNormalizer.php` and use `src/Repository/UserRepository.php` for normalized lookups.
 - Adapt registration, verification, password recovery, profile changes, and deletion in the matching classes under `src/Account/` and `src/Controller/`.
 - Add product-specific account deletion checks in `src/Account/AccountDeletionService.php` before the transactional removal step.
-- Customize message subjects, templates, sender policy, or queueing in `src/Mailer/AccountMailer.php` and the templates under `templates/email/`.
+- Configure the sender with `MAIL_FROM_EMAIL` and `MAIL_FROM_NAME`. Customize message subjects, templates, sender policy, or queueing in `src/Mailer/AccountMailer.php` and the templates under `templates/email/`.
 
 When adding side effects, decide explicitly whether they belong inside the Doctrine transition or after commit. External calls inside a transaction can succeed even if the database later rolls back; post-commit work needs retry and deduplication behavior.
 

@@ -6,6 +6,7 @@ namespace Te4g\Starter\Tests\Resources;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
+use Symfony\Component\Yaml\Yaml;
 
 final class PublicAccountResourcesTest extends TestCase
 {
@@ -142,12 +143,17 @@ final class PublicAccountResourcesTest extends TestCase
         );
     }
 
-    public function testMailerUsesEditableApplicationDefaultsAndApplicationTemplates(): void
+    public function testMailerUsesEnvironmentConfiguredSenderAndApplicationTemplates(): void
     {
         $source = $this->resource('src/Mailer/AccountMailer.php');
+        $configuration = Yaml::parse($this->resource('config/packages/account_mailer.yaml'));
 
-        self::assertStringContainsString("private string \$fromEmail = 'no-reply@example.com'", $source);
-        self::assertStringContainsString("private string \$fromName = 'Application'", $source);
+        self::assertStringContainsString("#[Autowire(env: 'MAIL_FROM_EMAIL')]", $source);
+        self::assertStringContainsString("#[Autowire(env: 'MAIL_FROM_NAME')]", $source);
+        self::assertStringNotContainsString('private string $fromEmail =', $source);
+        self::assertStringNotContainsString('private string $fromName =', $source);
+        self::assertSame('no-reply@example.com', $configuration['parameters']['env(MAIL_FROM_EMAIL)']);
+        self::assertSame('Application', $configuration['parameters']['env(MAIL_FROM_NAME)']);
         self::assertStringContainsString("'email/verify.html.twig'", $source);
         self::assertStringContainsString("'email/magic_link.html.twig'", $source);
         self::assertStringContainsString("'email/password_reset.html.twig'", $source);

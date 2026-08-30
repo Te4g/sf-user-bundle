@@ -1,0 +1,5 @@
+# yaml-language-server: $schema=../../vendor/symfony/dependency-injection/Loader/schema/services.schema.json
+
+parameters:
+    env(MAIL_FROM_EMAIL): 'no-reply@example.com'
+    env(MAIL_FROM_NAME): 'Application'

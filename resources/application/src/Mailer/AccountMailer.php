@@ -6,6 +6,7 @@ namespace App\Mailer;
 
 use App\Entity\User;
 use Symfony\Bridge\Twig\Mime\TemplatedEmail;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Address;
 
@@ -13,8 +14,10 @@ final readonly class AccountMailer
 {
     public function __construct(
         private MailerInterface $mailer,
-        private string $fromEmail = 'no-reply@example.com',
-        private string $fromName = 'Application',
+        #[Autowire(env: 'MAIL_FROM_EMAIL')]
+        private string $fromEmail,
+        #[Autowire(env: 'MAIL_FROM_NAME')]
+        private string $fromName,
     ) {
     }
 

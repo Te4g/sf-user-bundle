@@ -182,7 +182,12 @@ final class SelfAdministrationDoctrineTest extends TestCase
             $this->userRepository($this->entityManager),
             $this->newApplicationInstance('Account\\EmailNormalizer'),
             $helper,
-            $this->newApplicationInstance('Mailer\\AccountMailer', $this->createStub(MailerInterface::class)),
+            $this->newApplicationInstance(
+                'Mailer\\AccountMailer',
+                $this->createStub(MailerInterface::class),
+                'no-reply@example.com',
+                'Application',
+            ),
             $this->resetRequestRepository($this->entityManager),
         ];
         $service = new \ReflectionClass($this->applicationClass('Account\\ProfileService'));
@@ -218,7 +223,12 @@ final class SelfAdministrationDoctrineTest extends TestCase
             $this->resetRequestRepository($this->entityManager),
             new TransitionPasswordHasher(),
             $this->createStub(UrlGeneratorInterface::class),
-            $this->newApplicationInstance('Mailer\\AccountMailer', $this->createStub(MailerInterface::class)),
+            $this->newApplicationInstance(
+                'Mailer\\AccountMailer',
+                $this->createStub(MailerInterface::class),
+                'no-reply@example.com',
+                'Application',
+            ),
             $this->entityManager,
         );
     }

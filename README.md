@@ -44,6 +44,8 @@ Set a real Mailer transport before sending account email:
 
 ```dotenv
 MAILER_DSN=smtp://user:password@mail.example.com:587
+MAIL_FROM_EMAIL=no-reply@your-verified-domain.example
+MAIL_FROM_NAME=Application
 APP_URL=https://example.com
 ```
 
@@ -56,7 +58,12 @@ framework:
         default_uri: '%env(APP_URL)%'
 ```
 
-Review delivery, queue, retry, and sender policy in the generated `App\Mailer\AccountMailer`. The starter's validation uses a null transport; production delivery remains the application's responsibility.
+`MAIL_FROM_EMAIL` must use a domain authorized by the SMTP provider. The
+generated local fallback is `no-reply@example.com`, but production must
+override it; SMTP credentials do not authorize arbitrary From domains. Review
+delivery, queue, retry, and sender policy in the generated
+`App\Mailer\AccountMailer`. The starter's validation uses a null transport;
+production delivery remains the application's responsibility.
 
 ## Ownership and customization
 
