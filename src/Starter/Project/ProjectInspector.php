@@ -27,6 +27,13 @@ final readonly class ProjectInspector
     private const array DEFAULT_FIREWALLS = [
         [
             'dev' => [
+                'pattern' => '^/(_profiler(/|$)|(_wdt|assets|build)/)',
+                'security' => false,
+            ],
+            'main' => ['lazy' => true, 'provider' => 'users_in_memory'],
+        ],
+        [
+            'dev' => [
                 'pattern' => '^/(_(profiler|wdt)|css|images|js)/',
                 'security' => false,
             ],

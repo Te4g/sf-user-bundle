@@ -28,6 +28,7 @@ final class StarterApplication
             new ReplacementPolicy([
                 $packageRoot.'/resources/baselines/webapp',
                 $packageRoot.'/resources/baselines/twig-only',
+                $packageRoot.'/resources/baselines/security-7.4',
             ]),
             new RuntimeDependencyInstaller(new ProcessComposerRunner()),
             $processRunner,

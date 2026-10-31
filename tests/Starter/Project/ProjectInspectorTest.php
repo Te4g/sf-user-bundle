@@ -101,6 +101,13 @@ final class ProjectInspectorTest extends TestCase
                 'pattern' => '^/(_profiler|_wdt|assets|build)/',
             ],
         ]];
+        yield 'Symfony 7.4 recipe with bounded profiler path' => [[
+            'dev' => [
+                'pattern' => '^/(_profiler(/|$)|(_wdt|assets|build)/)',
+                'security' => false,
+            ],
+            'main' => ['lazy' => true, 'provider' => 'users_in_memory'],
+        ]];
     }
 
     /** @param array<string, array<string, bool|string>> $firewalls */

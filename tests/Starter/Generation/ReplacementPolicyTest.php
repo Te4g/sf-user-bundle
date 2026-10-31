@@ -55,6 +55,31 @@ final class ReplacementPolicyTest extends TestCase
         self::assertTrue($plan->writes()[0]->isReplacement());
     }
 
+    public function testCurrentSecurityRecipeIsReplaceableButCustomizationIsNot(): void
+    {
+        $layout = $this->layout();
+        $path = $layout->path('config/packages/security.yaml');
+        self::assertTrue(mkdir(dirname($path), 0700, true));
+        $contents = file_get_contents($this->baseline('config/packages/security.yaml', 'security-7.4'));
+        self::assertIsString($contents);
+        self::assertNotFalse(file_put_contents($path, $contents));
+
+        $plan = $this->policy()->plan($layout, [
+            'config/packages/security.yaml' => $this->generatedSecurityPath(),
+        ]);
+        self::assertSame([], $plan->conflicts());
+        self::assertTrue($plan->writes()[0]->isReplacement());
+
+        self::assertNotFalse(file_put_contents($path, $contents."# customized\n"));
+        $plan = $this->policy()->plan($layout, [
+            'config/packages/security.yaml' => $this->generatedSecurityPath(),
+        ]);
+        self::assertSame(
+            'config/packages/security.yaml: existing content is not a supported fresh Symfony baseline',
+            $plan->conflicts()[0]->message(),
+        );
+    }
+
     public function testRecognizedFreshTwigOnlyTemplateBaselineIsReplaceable(): void
     {
         $plan = $this->planForTemplateBaseline('twig-only');
@@ -139,6 +164,7 @@ YAML."\n"));
         return new ReplacementPolicy([
             dirname(__DIR__, 3).'/resources/baselines/webapp',
             dirname(__DIR__, 3).'/resources/baselines/twig-only',
+            dirname(__DIR__, 3).'/resources/baselines/security-7.4',
         ]);
     }
 
