@@ -29,16 +29,22 @@ The installer promotes the generated application's Composer dependencies, instal
 
 - a Doctrine `User` entity, reset-password request entity, and repositories;
 - registration and email verification;
+- server-verified Turnstile bot challenges and independent per-IP registration throttling;
 - password and magic-link login, logout, and login throttling;
 - password recovery;
 - profile, email, and password changes;
 - guarded self-service account deletion;
-- public, authentication, dashboard, and account layouts built with Twig Components, Turbo, Tailwind CSS, and two focused Stimulus controllers;
+- public, authentication, dashboard, and account layouts built with Twig Components, Turbo, Tailwind CSS, and focused Stimulus controllers;
 - functional tests covering the positive workflows and their security boundaries.
 
 There is no dry run, rollback, manifest, or supported rerun. If a subprocess fails, the command exits non-zero and prints the failing phase, exact command, exit code, stdout, and stderr. Preflight and generation conflicts identify the affected path and reason. Files already written before a later validation failure remain application files, so inspect the report and fix or discard the fresh project explicitly.
 
 ## Production configuration
+
+Registration is protected by Turnstile by default in production. Configure the
+site key, secret key and expected hostname before accepting signups; missing keys
+fail closed. Development and tests remain usable offline. See
+[bot protection and existing-application upgrades](docs/bot-protection.md).
 
 Set a real Mailer transport before sending account email:
 

@@ -1,5 +1,8 @@
 parameters:
     level: 8
+    scanFiles:
+        - resources/application/src/Account/RegistrationChallenge.php
+        - resources/application/tests/Unit/RegistrationChallengeTest.php
     paths:
         - src/Starter
         - tests/Starter

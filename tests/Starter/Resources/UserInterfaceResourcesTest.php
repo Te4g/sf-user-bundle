@@ -50,7 +50,19 @@ final class UserInterfaceResourcesTest extends TestCase
             'assets/controllers/alert_dialog_controller.js',
             'assets/controllers/password_visibility_controller.js',
             'assets/controllers/sidebar_controller.js',
+            'assets/controllers/turnstile_controller.js',
         ], $this->customControllerPaths($files));
+    }
+
+    public function testTurnstileWidgetHandlesTurboLifecycleAndProviderLoadFailures(): void
+    {
+        $process = new Process([
+            'node',
+            __DIR__.'/../Fixtures/turnstile-controller.test.mjs',
+            $this->applicationResources().'/assets/controllers/turnstile_controller.js',
+        ]);
+        $process->run();
+        self::assertTrue($process->isSuccessful(), $process->getOutput().$process->getErrorOutput());
     }
 
     public function testPagesUseApplicationRoutesLayoutsAndOneRestrainedDashboardCard(): void

@@ -40,6 +40,18 @@
                     </div>
                     {{ form_errors(form.plainPassword) }}{{ form_errors(form.plainPassword.second) }}
                 </twig:Field>
+                {% if bot_challenge_enabled %}
+                    {% if bot_challenge_site_key %}
+                        <div data-controller="turnstile" data-turnstile-site-key-value="{{ bot_challenge_site_key }}" data-action="turbo:before-cache@document->turnstile#beforeCache">
+                            {{ form_widget(form.botChallenge, {attr: {'data-turnstile-target': 'response'}}) }}
+                            <div data-turnstile-target="widget"></div>
+                            <p data-turnstile-target="error" role="alert" hidden>{{ 'registration.challenge_unavailable'|trans }}</p>
+                            <noscript><p>{{ 'registration.challenge_javascript'|trans }}</p></noscript>
+                        </div>
+                    {% else %}
+                        <p role="alert">{{ 'registration.challenge_unavailable'|trans }}</p>
+                    {% endif %}
+                {% endif %}
                 {{ form_rest(form) }}
                 <twig:Button type="submit" class="w-full" data-turbo-submits-with="{{ 'form.submitting'|trans }}"><twig:Spinner class="hidden" label="{{ 'form.submitting'|trans }}" />{{ 'registration.submit'|trans }}</twig:Button>
             {{ form_end(form, {render_rest: false}) }}

@@ -10,6 +10,8 @@ framework:
             cache_pool: cache.account_test_rate_limiter
         account_registration:
             cache_pool: cache.account_test_rate_limiter
+        account_registration_ip:
+            cache_pool: cache.account_test_rate_limiter
         account_magic_link:
             cache_pool: cache.account_test_rate_limiter
         account_password_reset:

@@ -14,6 +14,8 @@ final readonly class AccountRequestLimiter
         private EmailNormalizer $normalizer,
         #[Autowire(service: 'limiter.account_registration')]
         private RateLimiterFactoryInterface $registrationLimiter,
+        #[Autowire(service: 'limiter.account_registration_ip')]
+        private RateLimiterFactoryInterface $registrationIpLimiter,
         #[Autowire(service: 'limiter.account_magic_link')]
         private RateLimiterFactoryInterface $magicLinkLimiter,
         #[Autowire(service: 'limiter.account_password_reset')]
@@ -27,7 +29,10 @@ final readonly class AccountRequestLimiter
 
     public function registration(Request $request, string $email): bool
     {
-        return $this->accept($this->registrationLimiter, $request, $email);
+        $ipAccepted = $this->registrationIpLimiter->create(hash('sha256', $request->getClientIp() ?? 'unknown'))->consume()->isAccepted();
+        $emailAccepted = $this->accept($this->registrationLimiter, $request, $email);
+
+        return $ipAccepted && $emailAccepted;
     }
 
     public function magicLink(Request $request, string $email): bool

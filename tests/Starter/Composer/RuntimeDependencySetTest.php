@@ -20,6 +20,7 @@ final class RuntimeDependencySetTest extends TestCase
             'symfony/asset-mapper:^8.1',
             'symfony/clock:^8.1',
             'symfony/form:^8.1',
+            'symfony/http-client:^8.1',
             'symfony/mailer:^8.1',
             'symfony/password-hasher:^8.1',
             'symfony/rate-limiter:^8.1',
