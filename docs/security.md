@@ -8,6 +8,12 @@ Registration, verification resend, magic-link request, and password-reset reques
 
 Login is limited to five attempts per fifteen minutes. Account request flows use separate sliding-window limiters with the same limit, keyed by client IP plus a hash of the normalized email; raw email is not used as the limiter key. Password-reset requests also retain the upstream one-hour throttle.
 
+Registration additionally has an independent five-attempt IP limit and a
+server-verified Turnstile challenge enabled by default in production. Tokens must
+match the configured hostname and `register` action; missing configuration and
+provider failures reject the submission before account creation or email delivery.
+See [bot protection](bot-protection.md) for configuration and upgrade instructions.
+
 ## Signed links and sessions
 
 | Link | Lifetime | Additional controls |

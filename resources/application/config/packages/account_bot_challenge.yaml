@@ -1,0 +1,17 @@
+parameters:
+    account.turnstile.default_enabled: true
+    account.turnstile.enabled: '%env(bool:default:account.turnstile.default_enabled:TURNSTILE_ENABLED)%'
+
+services:
+    # Keep the Siteverify secret and response token out of HTTP profiler traces.
+    account.turnstile_http_client:
+        class: Symfony\Contracts\HttpClient\HttpClientInterface
+        factory: ['Symfony\Component\HttpClient\HttpClient', 'create']
+
+when@dev:
+    parameters:
+        account.turnstile.default_enabled: false
+
+when@test:
+    parameters:
+        account.turnstile.default_enabled: false

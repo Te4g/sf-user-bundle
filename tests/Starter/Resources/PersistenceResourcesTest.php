@@ -219,6 +219,7 @@ final class PersistenceResourcesTest extends TestCase
         self::assertSame([
             'account_login',
             'account_registration',
+            'account_registration_ip',
             'account_magic_link',
             'account_password_reset',
             'account_verification_resend',

@@ -1,0 +1,3 @@
+registration.challenge_failed: 'Please complete the security check and try again.'
+registration.challenge_unavailable: 'Registration is temporarily unavailable. Please try again later.'
+registration.challenge_javascript: 'Enable JavaScript to complete the security check.'
