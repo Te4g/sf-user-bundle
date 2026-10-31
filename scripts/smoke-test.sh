@@ -149,7 +149,8 @@ printf 'Creating the application-owned migration...\n'
 
 migration_count=0
 migration_file=''
-for candidate in "$APP_DIR"/migrations/Version*.php; do
+# Doctrine MigrationsBundle 3 uses migrations/, while its 4.x recipe uses src/Migrations/.
+for candidate in "$APP_DIR"/migrations/Version*.php "$APP_DIR"/src/Migrations/Version*.php; do
     [ -f "$candidate" ] || continue
     migration_count=$((migration_count + 1))
     migration_file="$candidate"
